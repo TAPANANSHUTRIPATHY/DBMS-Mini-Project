@@ -1,0 +1,37 @@
+body {
+  background: linear-gradient(135deg, #0f172a, #1e293b);
+  color: white;
+  font-family: Arial, sans-serif;
+  text-align: center;
+  margin: 0;
+  padding: 20px;
+}
+
+h1 {
+  margin-bottom: 30px;
+}
+
+.cards {
+  display: flex;
+  justify-content: center;
+  gap: 30px;
+  margin-bottom: 40px;
+}
+
+.card {
+  background: #111827;
+  padding: 20px;
+  border-radius: 15px;
+  width: 200px;
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+}
+
+.card p {
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.chart-container {
+  width: 80%;
+  margin: auto;
+}

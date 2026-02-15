@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IoT Environmental Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+  <h1>Environmental Monitoring Dashboard</h1>
+
+  <div class="cards">
+    <div class="card">
+      <h2>Temperature</h2>
+      <p id="temp">-- °C</p>
+    </div>
+
+    <div class="card">
+      <h2>Humidity</h2>
+      <p id="hum">-- %</p>
+    </div>
+
+    <div class="card">
+      <h2>Air Quality</h2>
+      <p id="air">--</p>
+    </div>
+  </div>
+
+  <div class="chart-container">
+    <canvas id="chart"></canvas>
+  </div>
+
+  <script src="script.js"></script>
+
+</body>
+</html>
