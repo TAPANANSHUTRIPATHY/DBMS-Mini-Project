@@ -1,42 +1,67 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>IoT Environmental Dashboard</title>
-    <link rel="stylesheet" href="style.css" />
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  </head>
-  <body>
-    <h1>Environmental Monitoring Dashboard</h1>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart IoT Command Center</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-gauge"></script>
+</head>
+<body>
 
-    <div class="cards">
-      <div class="card">
-        <h2>Temperature</h2>
-        <p id="temp">-- °C</p>
-      </div>
+<h1>🌍 Smart Environmental Monitoring System</h1>
 
-      <div class="card">
-        <h2>Humidity</h2>
-        <p id="hum">-- %</p>
-      </div>
+<div class="cards">
+  <div class="card" id="tempCard">
+    <h2>🌡 Temperature</h2>
+    <p id="temp">-- °C</p>
+  </div>
 
-      <div class="card">
-        <h2>Air Quality</h2>
-        <p id="air">--</p>
-      </div>
-    </div>
+  <div class="card" id="humCard">
+    <h2>💧 Humidity</h2>
+    <p id="hum">-- %</p>
+  </div>
 
-    <div class="chart-container">
-      <h2>Temperature & Humidity</h2>
-      <canvas id="tempHumChart"></canvas>
-    </div>
+  <div class="card" id="airCard">
+    <h2>🌫 Air Quality</h2>
+    <p id="air">--</p>
+    <p id="airStatus">--</p>
+  </div>
+</div>
 
-    <div class="chart-container">
-      <h2>Air Quality Index</h2>
-      <canvas id="airChart"></canvas>
-    </div>
+<div class="graphs">
+  <div class="graph-box" onclick="openModal('tempHumModal')">
+    <h3>Temperature & Humidity</h3>
+    <canvas id="tempHumChart"></canvas>
+  </div>
 
-    <script src="script.js"></script>
-  </body>
+  <div class="graph-box" onclick="openModal('airModal')">
+    <h3>Air Quality</h3>
+    <canvas id="airChart"></canvas>
+  </div>
+</div>
+
+<div class="gauge-container">
+  <h3>Air Quality Gauge</h3>
+  <canvas id="gaugeChart"></canvas>
+</div>
+
+<!-- MODALS -->
+<div id="tempHumModal" class="modal">
+  <div class="modal-content">
+    <span onclick="closeModal('tempHumModal')" class="close">&times;</span>
+    <canvas id="tempHumLarge"></canvas>
+  </div>
+</div>
+
+<div id="airModal" class="modal">
+  <div class="modal-content">
+    <span onclick="closeModal('airModal')" class="close">&times;</span>
+    <canvas id="airLarge"></canvas>
+  </div>
+</div>
+
+<script src="script.js"></script>
+</body>
 </html>
