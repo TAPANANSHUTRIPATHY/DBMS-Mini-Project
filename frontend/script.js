@@ -1,17 +1,25 @@
 const API_URL = "http://localhost:5000/api";
 
+/* ============================= */
+/*         DOM ELEMENTS          */
+/* ============================= */
+
 const tempEl = document.getElementById("temp");
 const humEl = document.getElementById("hum");
 const airEl = document.getElementById("air");
 const airStatusEl = document.getElementById("airStatus");
 const airCard = document.getElementById("airCard");
 
-const tempHumCtx = document.getElementById("tempHumChart").getContext("2d");
-const airCtx = document.getElementById("airChart").getContext("2d");
-const gaugeCtx = document.getElementById("gaugeChart").getContext("2d");
+const tempHumCtx = document.getElementById("tempHumChart")?.getContext("2d");
+const airCtx = document.getElementById("airChart")?.getContext("2d");
+const tempHumLargeCtx = document.getElementById("tempHumLarge")?.getContext("2d");
+const airLargeCtx = document.getElementById("airLarge")?.getContext("2d");
 
-const tempHumLargeCtx = document.getElementById("tempHumLarge").getContext("2d");
-const airLargeCtx = document.getElementById("airLarge").getContext("2d");
+const airGaugeCtx = document.getElementById("airGauge")?.getContext("2d");
+const tempGaugeCtx = document.getElementById("tempGauge")?.getContext("2d");
+
+const airGaugeValue = document.getElementById("airGaugeValue");
+const tempGaugeValue = document.getElementById("tempGaugeValue");
 
 /* ============================= */
 /*        AIR STATUS LOGIC       */
@@ -24,102 +32,122 @@ function getAirStatus(value) {
 }
 
 /* ============================= */
-/*      SMALL DASHBOARD GRAPHS   */
+/*         SMALL GRAPHS          */
 /* ============================= */
 
-const tempHumChart = new Chart(tempHumCtx, {
-  type: "line",
-  data: {
-    labels: [],
-    datasets: [
-      {
-        label: "Temperature (°C)",
-        borderColor: "#ff4d4d",
-        backgroundColor: "rgba(255,77,77,0.2)",
-        data: [],
-        tension: 0.4
+let tempHumChart = tempHumCtx
+  ? new Chart(tempHumCtx, {
+      type: "line",
+      data: {
+        labels: [],
+        datasets: [
+          {
+            label: "Temperature (°C)",
+            borderColor: "#ff4d4d",
+            backgroundColor: "rgba(255,77,77,0.2)",
+            data: [],
+            tension: 0.4
+          },
+          {
+            label: "Humidity (%)",
+            borderColor: "#00ffff",
+            backgroundColor: "rgba(0,255,255,0.2)",
+            data: [],
+            tension: 0.4
+          }
+        ]
       },
-      {
-        label: "Humidity (%)",
-        borderColor: "#00ffff",
-        backgroundColor: "rgba(0,255,255,0.2)",
-        data: [],
-        tension: 0.4
+      options: {
+        plugins: { legend: { labels: { color: "white" } } },
+        scales: {
+          x: { ticks: { color: "white" } },
+          y: { ticks: { color: "white" } }
+        }
       }
-    ]
-  },
-  options: {
-    plugins: { legend: { labels: { color: "white" } } },
-    scales: {
-      x: { ticks: { color: "white" } },
-      y: { ticks: { color: "white" } }
-    }
-  }
-});
+    })
+  : null;
 
-const airChart = new Chart(airCtx, {
-  type: "line",
-  data: {
-    labels: [],
-    datasets: [
-      {
-        label: "Air Quality",
-        borderColor: "#00ff00",
-        backgroundColor: "rgba(0,255,0,0.2)",
-        data: [],
-        tension: 0.4
+let airChart = airCtx
+  ? new Chart(airCtx, {
+      type: "line",
+      data: {
+        labels: [],
+        datasets: [
+          {
+            label: "Air Quality",
+            borderColor: "#00ff00",
+            backgroundColor: "rgba(0,255,0,0.2)",
+            data: [],
+            tension: 0.4
+          }
+        ]
+      },
+      options: {
+        plugins: { legend: { labels: { color: "white" } } },
+        scales: {
+          x: { ticks: { color: "white" } },
+          y: { ticks: { color: "white" } }
+        }
       }
-    ]
-  },
-  options: {
-    plugins: { legend: { labels: { color: "white" } } },
-    scales: {
-      x: { ticks: { color: "white" } },
-      y: { ticks: { color: "white" } }
-    }
-  }
-});
+    })
+  : null;
 
 /* ============================= */
-/*          GAUGE CHART          */
+/*            GAUGES             */
 /* ============================= */
 
-const gaugeChart = new Chart(gaugeCtx, {
-  type: "doughnut",
-  data: {
-    labels: ["Air Quality"],
-    datasets: [{
-      data: [0, 3000],
-      backgroundColor: ["#00ff00", "#222"],
-      borderWidth: 0
-    }]
-  },
-  options: {
-    circumference: 180,
-    rotation: 270,
-    cutout: "70%",
-    plugins: {
-      legend: { display: false }
-    }
-  }
-});
+let airGauge = airGaugeCtx
+  ? new Chart(airGaugeCtx, {
+      type: "doughnut",
+      data: {
+        datasets: [{
+          data: [0, 3000],
+          backgroundColor: ["#00ff00", "#222"],
+          borderWidth: 0
+        }]
+      },
+      options: {
+        rotation: -90,
+        circumference: 180,
+        cutout: "70%",
+        plugins: { legend: { display: false } }
+      }
+    })
+  : null;
+
+let tempGauge = tempGaugeCtx
+  ? new Chart(tempGaugeCtx, {
+      type: "doughnut",
+      data: {
+        datasets: [{
+          data: [0, 50],
+          backgroundColor: ["#ff4d4d", "#222"],
+          borderWidth: 0
+        }]
+      },
+      options: {
+        rotation: -90,
+        circumference: 180,
+        cutout: "70%",
+        plugins: { legend: { display: false } }
+      }
+    })
+  : null;
 
 /* ============================= */
-/*       LARGE POPUP GRAPHS      */
+/*         LARGE POPUPS          */
 /* ============================= */
 
-let tempHumLargeChart = new Chart(tempHumLargeCtx, {
-  type: "line",
-  data: { labels: [], datasets: [] }
-});
+let tempHumLargeChart = tempHumLargeCtx
+  ? new Chart(tempHumLargeCtx, { type: "line", data: { labels: [], datasets: [] } })
+  : null;
 
-let airLargeChart = new Chart(airLargeCtx, {
-  type: "line",
-  data: { labels: [], datasets: [] }
-});
+let airLargeChart = airLargeCtx
+  ? new Chart(airLargeCtx, { type: "line", data: { labels: [], datasets: [] } })
+  : null;
 
 /* ============================= */
-/*        FETCH FUNCTIONS        */
+/*         FETCH DATA            */
 /* ============================= */
 
 async function fetchLatest() {
@@ -127,18 +155,27 @@ async function fetchLatest() {
   const data = await res.json();
   if (!data) return;
 
-  tempEl.textContent = data.temperature + " °C";
-  humEl.textContent = data.humidity + " %";
-  airEl.textContent = data.air_quality;
+  if (tempEl) tempEl.textContent = data.temperature + " °C";
+  if (humEl) humEl.textContent = data.humidity + " %";
+  if (airEl) airEl.textContent = data.air_quality;
 
   const status = getAirStatus(data.air_quality);
-  airStatusEl.textContent = status.text;
-  airCard.style.boxShadow = `0 0 30px ${status.color}`;
+  if (airStatusEl) airStatusEl.textContent = status.text;
+  if (airCard) airCard.style.boxShadow = `0 0 30px ${status.color}`;
 
-  /* Update Gauge */
-  gaugeChart.data.datasets[0].data = [data.air_quality, 3000 - data.air_quality];
-  gaugeChart.data.datasets[0].backgroundColor[0] = status.color;
-  gaugeChart.update();
+  if (airGauge) {
+    airGauge.data.datasets[0].data = [data.air_quality, 3000 - data.air_quality];
+    airGauge.data.datasets[0].backgroundColor[0] = status.color;
+    airGauge.update();
+  }
+
+  if (tempGauge) {
+    tempGauge.data.datasets[0].data = [data.temperature, 50 - data.temperature];
+    tempGauge.update();
+  }
+
+  if (airGaugeValue) airGaugeValue.innerText = data.air_quality;
+  if (tempGaugeValue) tempGaugeValue.innerText = data.temperature + " °C";
 }
 
 async function fetchHistory() {
@@ -149,25 +186,30 @@ async function fetchHistory() {
     new Date(d.created_at).toLocaleTimeString()
   );
 
-  /* Update small graphs */
-  tempHumChart.data.labels = labels;
-  tempHumChart.data.datasets[0].data = data.map(d => d.temperature);
-  tempHumChart.data.datasets[1].data = data.map(d => d.humidity);
+  if (tempHumChart) {
+    tempHumChart.data.labels = labels;
+    tempHumChart.data.datasets[0].data = data.map(d => d.temperature);
+    tempHumChart.data.datasets[1].data = data.map(d => d.humidity);
+    tempHumChart.update();
+  }
 
-  airChart.data.labels = labels;
-  airChart.data.datasets[0].data = data.map(d => d.air_quality);
+  if (airChart) {
+    airChart.data.labels = labels;
+    airChart.data.datasets[0].data = data.map(d => d.air_quality);
+    airChart.update();
+  }
 
-  tempHumChart.update();
-  airChart.update();
+  if (tempHumLargeChart && tempHumChart) {
+    tempHumLargeChart.data.labels = labels;
+    tempHumLargeChart.data.datasets = JSON.parse(JSON.stringify(tempHumChart.data.datasets));
+    tempHumLargeChart.update();
+  }
 
-  /* Update large popup graphs */
-  tempHumLargeChart.data.labels = labels;
-  tempHumLargeChart.data.datasets = JSON.parse(JSON.stringify(tempHumChart.data.datasets));
-  tempHumLargeChart.update();
-
-  airLargeChart.data.labels = labels;
-  airLargeChart.data.datasets = JSON.parse(JSON.stringify(airChart.data.datasets));
-  airLargeChart.update();
+  if (airLargeChart && airChart) {
+    airLargeChart.data.labels = labels;
+    airLargeChart.data.datasets = JSON.parse(JSON.stringify(airChart.data.datasets));
+    airLargeChart.update();
+  }
 }
 
 /* ============================= */
@@ -181,6 +223,27 @@ function openModal(id) {
 function closeModal(id) {
   document.getElementById(id).style.display = "none";
 }
+
+/* ============================= */
+/*        EXPORT CSV             */
+/* ============================= */
+
+document.getElementById("exportBtn")?.addEventListener("click", async () => {
+  const res = await fetch(`${API_URL}/history`);
+  const data = await res.json();
+
+  let csv = "Temperature,Humidity,Air Quality,Time\n";
+  data.forEach(row => {
+    csv += `${row.temperature},${row.humidity},${row.air_quality},${row.created_at}\n`;
+  });
+
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "sensor_data.csv";
+  a.click();
+});
 
 /* ============================= */
 /*        AUTO REFRESH           */

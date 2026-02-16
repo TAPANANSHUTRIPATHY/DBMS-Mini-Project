@@ -1,20 +1,47 @@
+/* ============================= */
+/*        GLOBAL STYLING         */
+/* ============================= */
+
 body {
-  background: radial-gradient(circle at center, #0f172a, #000);
-  color: white;
-  font-family: 'Segoe UI', sans-serif;
-  text-align: center;
   margin: 0;
-  padding: 20px;
+  font-family: 'Segoe UI', sans-serif;
+  color: white;
+  background: #0f172a;
+  overflow-x: hidden;
+}
+
+/* Animated futuristic wave background */
+body::before {
+  content: "";
+  position: fixed;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle at center, rgba(0,255,255,0.15), transparent 60%);
+  animation: rotateBg 18s linear infinite;
+  z-index: -1;
+}
+
+@keyframes rotateBg {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 h1 {
-  margin-bottom: 30px;
+  text-align: center;
+  margin: 20px;
+  font-size: 28px;
+  letter-spacing: 1px;
 }
+
+/* ============================= */
+/*            CARDS              */
+/* ============================= */
 
 .cards {
   display: flex;
   justify-content: center;
   gap: 25px;
+  flex-wrap: wrap;
   margin-bottom: 40px;
 }
 
@@ -22,68 +49,163 @@ h1 {
   background: #111827;
   padding: 20px;
   border-radius: 15px;
-  width: 220px;
-  box-shadow: 0 0 25px cyan;
-  transition: 0.4s;
-  animation: float 4s infinite ease-in-out;
+  width: 250px;
+  text-align: center;
+  box-shadow: 0 0 20px cyan;
+  transition: 0.4s ease;
+  animation: float 4s ease-in-out infinite;
 }
 
 .card:hover {
-  transform: scale(1.1);
+  transform: scale(1.08);
 }
 
+.card h2 {
+  margin-bottom: 10px;
+}
+
+.card p {
+  font-size: 24px;
+  font-weight: bold;
+}
+
+/* Floating animation */
 @keyframes float {
   0% { transform: translateY(0px); }
   50% { transform: translateY(-8px); }
   100% { transform: translateY(0px); }
 }
 
+/* ============================= */
+/*         GRAPH SECTION         */
+/* ============================= */
+
 .graphs {
   display: flex;
   justify-content: center;
-  gap: 30px;
+  gap: 25px;
+  flex-wrap: wrap;
+  margin-bottom: 40px;
 }
 
 .graph-box {
   width: 45%;
+  min-width: 320px;
   background: #111827;
-  padding: 20px;
+  padding: 15px;
   border-radius: 15px;
-  box-shadow: 0 0 20px cyan;
+  box-shadow: 0 0 15px cyan;
   cursor: pointer;
+  transition: 0.3s ease;
 }
 
+.graph-box:hover {
+  transform: scale(1.02);
+  box-shadow: 0 0 25px #00ffff;
+}
+
+.graph-box h3 {
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+/* ============================= */
+/*            GAUGES             */
+/* ============================= */
+
 .gauge-container {
-  width: 40%;
-  margin: 40px auto;
+  width: 320px;
+  margin: 30px auto;
   background: #111827;
-  padding: 20px;
+  padding: 15px;
   border-radius: 15px;
   box-shadow: 0 0 20px cyan;
+  text-align: center;
+  transition: 0.3s ease;
 }
+
+.gauge-container:hover {
+  box-shadow: 0 0 30px #00ffff;
+}
+
+.gauge-container p {
+  font-size: 22px;
+  margin-top: 10px;
+}
+
+/* ============================= */
+/*           EXPORT BTN          */
+/* ============================= */
+
+button {
+  display: block;
+  margin: 20px auto;
+  padding: 12px 25px;
+  background: linear-gradient(90deg, cyan, #00ffff);
+  border: none;
+  border-radius: 12px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: 0.3s ease;
+}
+
+button:hover {
+  background: #00aaaa;
+  transform: scale(1.05);
+}
+
+/* ============================= */
+/*            MODALS             */
+/* ============================= */
 
 .modal {
   display: none;
   position: fixed;
-  z-index: 1;
-  padding-top: 60px;
+  z-index: 10;
   left: 0;
   top: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0,0,0,0.8);
+  overflow: auto;
+  background-color: rgba(0, 0, 0, 0.85);
 }
 
 .modal-content {
-  margin: auto;
-  padding: 20px;
-  width: 80%;
   background: #0f172a;
+  margin: 5% auto;
+  padding: 20px;
   border-radius: 15px;
+  width: 85%;
+  box-shadow: 0 0 25px cyan;
 }
 
 .close {
   float: right;
   font-size: 28px;
   cursor: pointer;
+}
+
+/* ============================= */
+/*        RESPONSIVE MOBILE      */
+/* ============================= */
+
+@media (max-width: 768px) {
+
+  .cards {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .graphs {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .graph-box {
+    width: 90%;
+  }
+
+  .gauge-container {
+    width: 90%;
+  }
 }
