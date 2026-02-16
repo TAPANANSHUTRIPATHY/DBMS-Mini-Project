@@ -42,17 +42,26 @@
   </div>
 </div>
 
-<div class="gauge-container">
-  <h3>Air Quality Gauge</h3>
-  <canvas id="airGauge"></canvas>
-  <p id="airGaugeValue"></p>
+<div class="gauge-row">
+
+  <div class="gauge-container">
+    <h3>Air Quality</h3>
+    <div class="gauge-wrapper">
+      <canvas id="airGauge"></canvas>
+      <div class="gauge-value" id="airGaugeValue">--</div>
+    </div>
+  </div>
+
+  <div class="gauge-container">
+    <h3>Temperature</h3>
+    <div class="gauge-wrapper">
+      <canvas id="tempGauge"></canvas>
+      <div class="gauge-value" id="tempGaugeValue">--</div>
+    </div>
+  </div>
+
 </div>
 
-<div class="gauge-container">
-  <h3>Temperature Gauge</h3>
-  <canvas id="tempGauge"></canvas>
-  <p id="tempGaugeValue"></p>
-</div>
 
 <button id="exportBtn">📤 Export Data to CSV</button>
 
