@@ -1,11 +1,10 @@
 const { Pool } = require('pg');
-require('dotenv').config();
 
 const pool = new Pool({
-  host: 'localhost',
   user: 'postgres',
-  password: 'TAPANANSHU',  // change if different
+  host: 'localhost',
   database: 'iotdb',
+  password: 'TAPANANSHU',
   port: 5432,
 });
 
