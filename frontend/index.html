@@ -1,57 +1,228 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Smart IoT Command Center</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Rajdhani:wght@300;400;500;600&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-gauge"></script>
 </head>
 <body>
 
-<h1>🌍 Smart Environmental Monitoring System</h1>
+<canvas id="bgCanvas"></canvas>
+<div class="scanlines"></div>
 
+<header>
+  <div class="header-left">
+    <div class="logo-mark">
+      <span class="logo-pulse"></span>
+      <svg viewBox="0 0 28 28" class="logo-svg">
+        <polygon points="14,2 26,8 26,20 14,26 2,20 2,8" fill="none" stroke="currentColor" stroke-width="1.5"/>
+        <circle cx="14" cy="14" r="4" fill="currentColor"/>
+      </svg>
+    </div>
+    <div class="logo-text">ENV<span class="accent">CORE</span></div>
+    <div class="location-badge">
+      <svg id="locationIcon" class="loc-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+        <circle cx="12" cy="9" r="2.5"/>
+      </svg>
+      <span id="locationDisplay" class="loc-text">--</span>
+    </div>
+  </div>
+  <div class="header-center">
+    <h1>Smart Environmental Monitoring</h1>
+    <div class="header-meta">
+      <span id="clockDisplay" class="clock">--:--:--</span>
+      <span class="sep">|</span>
+      <div class="live-badge"><span class="live-dot"></span>LIVE</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <button class="theme-btn" id="themeToggle" title="Toggle theme">
+      <span class="theme-icon">&#9728;</span>
+      <span class="theme-icon">&#9789;</span>
+      <span class="theme-slider"></span>
+    </button>
+    <a href="dashboard.html" class="nav-btn">&#128202; Dashboard</a>
+  </div>
+</header>
+
+<div id="alertBanner" class="alert-banner hidden">
+  <span class="alert-icon">&#9888;</span>
+  <span id="alertText"></span>
+  <button class="alert-close" onclick="document.getElementById('alertBanner').classList.add('hidden')">&#10005;</button>
+</div>
+
+<section class="health-section">
+  <div class="health-ring-wrap">
+    <canvas id="healthRing" width="220" height="220"></canvas>
+    <div class="health-center">
+      <div class="health-score-num" id="healthScore">--</div>
+      <div class="health-score-label">HEALTH SCORE</div>
+      <div class="health-score-sub" id="healthGrade">--</div>
+    </div>
+    <div class="health-ring-glow"></div>
+  </div>
+  <div class="health-legend">
+    <div class="hl-item"><span class="hl-dot temp-c"></span><span>Temperature</span><strong id="hlTemp">--</strong></div>
+    <div class="hl-item"><span class="hl-dot hum-c"></span><span>Humidity</span><strong id="hlHum">--</strong></div>
+    <div class="hl-item"><span class="hl-dot aqi-c"></span><span>Air Quality</span><strong id="hlAqi">--</strong></div>
+  </div>
+</section>
+
+<div class="section-label"><span>SENSOR READINGS</span></div>
 <div class="cards">
+
   <div class="card" id="tempCard">
-    <h2>🌡 Temperature</h2>
-    <p id="temp">-- °C</p>
-  </div>
-
-  <div class="card" id="humCard">
-    <h2>💧 Humidity</h2>
-    <p id="hum">-- %</p>
-  </div>
-
-  <div class="card" id="airCard">
-    <h2>🌫 Air Quality</h2>
-    <p id="air">--</p>
-    <p id="airStatus">--</p>
-  </div>
-</div>
-
-<div class="graphs">
-  <div class="graph-box" onclick="openModal('tempHumModal')">
-    <h3>Temperature & Humidity</h3>
-    <canvas id="tempHumChart"></canvas>
-  </div>
-
-  <div class="graph-box" onclick="openModal('airModal')">
-    <h3>Air Quality</h3>
-    <canvas id="airChart"></canvas>
-  </div>
-</div>
-
-<div class="gauge-row">
-
-  <div class="gauge-container">
-    <h3>Air Quality</h3>
-    <div class="gauge-wrapper">
-      <canvas id="airGauge"></canvas>
-      <div class="gauge-value" id="airGaugeValue">--</div>
+    <div class="card-bg-anim temp-bg"></div>
+    <div class="card-top">
+      <div class="sensor-icon-wrap">
+        <svg class="sensor-svg" viewBox="0 0 60 120">
+          <defs>
+            <linearGradient id="tg" x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0%" stop-color="#ff4d4d"/><stop offset="100%" stop-color="#ffaa00"/>
+            </linearGradient>
+          </defs>
+          <rect x="22" y="10" width="16" height="68" rx="8" fill="none" stroke="#ff4d4d" stroke-width="1.5" opacity=".7"/>
+          <rect x="25" y="12" width="10" height="65" rx="5" fill="rgba(255,77,77,0.1)"/>
+          <rect x="25" y="45" width="10" height="32" rx="5" fill="url(#tg)"/>
+          <circle cx="30" cy="95" r="11" fill="#ff4d4d" opacity=".85"/>
+          <circle cx="30" cy="95" r="6" fill="#ff8080"/>
+          <line x1="38" y1="28" x2="43" y2="28" stroke="#ff4d4d" stroke-width="1.2" opacity=".6"/>
+          <line x1="38" y1="43" x2="43" y2="43" stroke="#ff4d4d" stroke-width="1.2" opacity=".6"/>
+          <line x1="38" y1="58" x2="43" y2="58" stroke="#ff4d4d" stroke-width="1.2" opacity=".6"/>
+          <line x1="38" y1="73" x2="43" y2="73" stroke="#ff4d4d" stroke-width="1.2" opacity=".6"/>
+        </svg>
+        <div class="heat-rings">
+          <div class="h-ring r1"></div><div class="h-ring r2"></div><div class="h-ring r3"></div>
+        </div>
+      </div>
+      <div>
+        <div class="card-label-tag">TEMPERATURE</div>
+        <div id="temp" class="card-value temp-val">-- &#176;C</div>
+      </div>
+    </div>
+    <div class="card-sparkline-wrap"><canvas id="tempSparkline"></canvas></div>
+    <div class="card-bar-row"><div class="card-bar"><div class="bar-fill temp-bar" id="tempBar"></div></div></div>
+    <div class="card-stats">
+      <span class="stat-badge">MIN<strong id="tempMin">--</strong></span>
+      <span class="stat-badge accent-stat">AVG<strong id="tempAvg">--</strong></span>
+      <span class="stat-badge">MAX<strong id="tempMax">--</strong></span>
     </div>
   </div>
 
+  <div class="card" id="humCard">
+    <div class="card-bg-anim hum-bg"></div>
+    <div class="card-top">
+      <div class="sensor-icon-wrap">
+        <svg class="sensor-svg" viewBox="0 0 80 100">
+          <defs>
+            <linearGradient id="dg" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#00e5ff"/><stop offset="100%" stop-color="#0057ff"/>
+            </linearGradient>
+          </defs>
+          <path class="drop-anim" d="M40 8 Q68 48 68 64 A28 28 0 0 1 12 64 Q12 48 40 8Z" fill="url(#dg)" opacity=".85"/>
+          <ellipse cx="30" cy="55" rx="6" ry="11" fill="white" opacity=".2" transform="rotate(-20 30 55)"/>
+          <path class="drop-mini da" d="M14 22 Q21 33 21 39 A7 7 0 0 1 7 39 Q7 33 14 22Z" fill="#00e5ff" opacity=".5"/>
+          <path class="drop-mini db" d="M63 14 Q70 25 70 30 A7 7 0 0 1 56 30 Q56 25 63 14Z" fill="#00e5ff" opacity=".4"/>
+        </svg>
+        <div class="ripple-wrap"><div class="rip rp1"></div><div class="rip rp2"></div></div>
+      </div>
+      <div>
+        <div class="card-label-tag">HUMIDITY</div>
+        <div id="hum" class="card-value hum-val">-- %</div>
+      </div>
+    </div>
+    <div class="card-sparkline-wrap"><canvas id="humSparkline"></canvas></div>
+    <div class="card-bar-row"><div class="card-bar"><div class="bar-fill hum-bar" id="humBar"></div></div></div>
+    <div class="card-stats">
+      <span class="stat-badge">MIN<strong id="humMin">--</strong></span>
+      <span class="stat-badge accent-stat">AVG<strong id="humAvg">--</strong></span>
+      <span class="stat-badge">MAX<strong id="humMax">--</strong></span>
+    </div>
+  </div>
+
+  <div class="card" id="airCard">
+    <div class="card-bg-anim air-bg"></div>
+    <div class="card-top">
+      <div class="sensor-icon-wrap">
+        <div class="aqi-orb-wrap">
+          <div class="aqi-ring aq1"></div><div class="aqi-ring aq2"></div><div class="aqi-ring aq3"></div>
+          <svg class="aqi-leaf" viewBox="0 0 60 60">
+            <path d="M30 5 Q55 10 55 35 Q55 55 30 57 Q5 55 5 35 Q5 10 30 5Z" fill="none" stroke="#00ff88" stroke-width="1.8"/>
+            <path d="M30 57 Q30 35 46 18" fill="none" stroke="#00ff88" stroke-width="1.2" stroke-dasharray="3 3"/>
+          </svg>
+        </div>
+      </div>
+      <div>
+        <div class="card-label-tag">AIR QUALITY INDEX</div>
+        <div id="air" class="card-value air-val">--</div>
+        <div id="airStatus" class="air-status-badge">--</div>
+      </div>
+    </div>
+    <div class="card-sparkline-wrap"><canvas id="airSparkline"></canvas></div>
+    <div class="card-bar-row"><div class="card-bar"><div class="bar-fill air-bar" id="airBar"></div></div></div>
+    <div class="card-stats">
+      <span class="stat-badge">MIN<strong id="airMin">--</strong></span>
+      <span class="stat-badge accent-stat">AVG<strong id="airAvg">--</strong></span>
+      <span class="stat-badge">MAX<strong id="airMax">--</strong></span>
+    </div>
+  </div>
+
+</div>
+
+<!-- 3 GRAPH TILES -->
+<div class="section-label"><span>REAL-TIME ANALYTICS</span></div>
+<div class="graph-tiles">
+
+  <div class="tile" id="tileTempLine">
+    <div class="tile-header">
+      <div class="tile-title-group"><span class="tile-dot temp-c"></span><h3>Temperature</h3></div>
+      <div class="tile-actions">
+        <span class="ts min">&#8595;<span id="tTempMin">--</span></span>
+        <span class="ts avg">~<span id="tTempAvg">--</span></span>
+        <span class="ts max">&#8593;<span id="tTempMax">--</span></span>
+        <button class="fullscreen-btn" onclick="openModal('tempModal')">&#10559;</button>
+      </div>
+    </div>
+    <div class="tile-chart-wrap"><canvas id="tempHumChart"></canvas></div>
+  </div>
+
+  <div class="tile" id="tileHumLine">
+    <div class="tile-header">
+      <div class="tile-title-group"><span class="tile-dot hum-c"></span><h3>Humidity</h3></div>
+      <div class="tile-actions">
+        <span class="ts min">&#8595;<span id="tHumMin">--</span></span>
+        <span class="ts avg">~<span id="tHumAvg">--</span></span>
+        <span class="ts max">&#8593;<span id="tHumMax">--</span></span>
+        <button class="fullscreen-btn" onclick="openModal('humModal')">&#10559;</button>
+      </div>
+    </div>
+    <div class="tile-chart-wrap"><canvas id="humLineChart"></canvas></div>
+  </div>
+
+  <div class="tile tile-aqi-center" id="tileAqiLine">
+    <div class="tile-header">
+      <div class="tile-title-group"><span class="tile-dot aqi-c"></span><h3>Air Quality Index</h3></div>
+      <div class="tile-actions">
+        <span class="ts min">&#8595;<span id="tAqiMin">--</span></span>
+        <span class="ts avg">~<span id="tAqiAvg">--</span></span>
+        <span class="ts max">&#8593;<span id="tAqiMax">--</span></span>
+        <button class="fullscreen-btn" onclick="openModal('airModal')">&#10559;</button>
+      </div>
+    </div>
+    <div class="tile-chart-wrap"><canvas id="airChart"></canvas></div>
+  </div>
+
+</div>
+
+<!-- GAUGES -->
+<div class="section-label"><span>SENSOR GAUGES</span></div>
+<div class="gauge-row">
   <div class="gauge-container">
     <h3>Temperature</h3>
     <div class="gauge-wrapper">
@@ -59,28 +230,60 @@
       <div class="gauge-value" id="tempGaugeValue">--</div>
     </div>
   </div>
-
-</div>
-
-
-<button id="exportBtn">📤 Export Data to CSV</button>
-
-
-<!-- MODALS -->
-<div id="tempHumModal" class="modal">
-  <div class="modal-content">
-    <span onclick="closeModal('tempHumModal')" class="close">&times;</span>
-    <canvas id="tempHumLarge"></canvas>
+  <div class="gauge-container">
+    <h3>Humidity</h3>
+    <div class="gauge-wrapper">
+      <canvas id="humGauge"></canvas>
+      <div class="gauge-value" id="humGaugeValue">--</div>
+    </div>
+  </div>
+  <div class="gauge-container">
+    <h3>Air Quality</h3>
+    <div class="gauge-wrapper">
+      <canvas id="airGauge"></canvas>
+      <div class="gauge-value" id="airGaugeValue">--</div>
+    </div>
   </div>
 </div>
 
-<div id="airModal" class="modal">
+<!-- MODALS — each uses its OWN canvas, never shared with tile canvases -->
+<div id="tempModal" class="modal" onclick="if(event.target===this)closeModal('tempModal')">
   <div class="modal-content">
-    <span onclick="closeModal('airModal')" class="close">&times;</span>
-    <canvas id="airLarge"></canvas>
+    <div class="modal-head">
+      <h3 class="modal-title">Temperature &mdash; Full View</h3>
+      <span class="close" onclick="closeModal('tempModal')">&#10005;</span>
+    </div>
+    <div class="modal-chart-wrap"><canvas id="tempLargeCanvas"></canvas></div>
   </div>
 </div>
 
+<div id="humModal" class="modal" onclick="if(event.target===this)closeModal('humModal')">
+  <div class="modal-content">
+    <div class="modal-head">
+      <h3 class="modal-title">Humidity &mdash; Full View</h3>
+      <span class="close" onclick="closeModal('humModal')">&#10005;</span>
+    </div>
+    <div class="modal-chart-wrap"><canvas id="humLargeCanvas"></canvas></div>
+  </div>
+</div>
+
+<div id="airModal" class="modal" onclick="if(event.target===this)closeModal('airModal')">
+  <div class="modal-content">
+    <div class="modal-head">
+      <h3 class="modal-title">Air Quality Index &mdash; Full View</h3>
+      <span class="close" onclick="closeModal('airModal')">&#10005;</span>
+    </div>
+    <div class="modal-chart-wrap"><canvas id="airLargeCanvas"></canvas></div>
+  </div>
+</div>
+
+<!--
+  LOAD ORDER (critical):
+  1. script.js  — fetches API data, creates tempHumChart + airChart + tempGauge + airGauge
+  2. charts.js  — reads from script.js charts, adds humidity tile, modals, health ring, etc.
+-->
 <script src="script.js"></script>
+<script src="charts.js"></script>
+
 </body>
 </html>

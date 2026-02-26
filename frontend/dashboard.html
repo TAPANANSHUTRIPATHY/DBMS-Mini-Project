@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ENVCORE — Dashboard</title>
+
+  <!-- Shared base styles -->
+  <link rel="stylesheet" href="style.css">
+  <!-- Dashboard-specific styles -->
+  <link rel="stylesheet" href="dashboard.css">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Rajdhani:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+<!-- Animated particle background canvas -->
+<canvas id="bgCanvas"></canvas>
+<div class="scanlines"></div>
+
+<!-- ══════════════════════════════════════
+     HEADER
+══════════════════════════════════════ -->
+<header>
+  <div class="header-left">
+    <div class="logo-mark">
+      <span class="logo-pulse"></span>
+      <svg viewBox="0 0 28 28" class="logo-svg">
+        <polygon points="14,2 26,8 26,20 14,26 2,20 2,8"
+                 fill="none" stroke="currentColor" stroke-width="1.5"/>
+        <circle cx="14" cy="14" r="4" fill="currentColor"/>
+      </svg>
+    </div>
+    <div class="logo-text">ENV<span class="accent">CORE</span></div>
+  </div>
+
+  <div class="header-center">
+    <h1>Historical Data Dashboard</h1>
+    <div class="header-meta">
+      <span id="clockDisplay" class="clock">--:--:--</span>
+      <span class="sep">|</span>
+      <div class="live-badge">
+        <span class="live-dot"></span>LIVE
+      </div>
+    </div>
+  </div>
+
+  <div class="header-right">
+    <a href="index.html" class="nav-btn">&#8592; Live Monitor</a>
+    <button class="theme-btn" id="themeToggle" title="Toggle theme">
+      <span class="theme-icon">&#9728;</span>
+      <span class="theme-icon">&#9789;</span>
+      <span class="theme-slider"></span>
+    </button>
+  </div>
+</header>
+
+<!-- ══════════════════════════════════════
+     MAIN CONTENT WRAPPER
+══════════════════════════════════════ -->
+<div class="db-wrap">
+
+  <!-- ── Date Controls Bar ── -->
+  <div class="date-bar">
+    <label for="datePicker">VIEW DATE</label>
+    <input type="date" id="datePicker" class="date-input" />
+
+    <div class="quick-dates">
+      <button class="qd-btn active" data-offset="0">Today</button>
+      <button class="qd-btn" data-offset="1">Yesterday</button>
+      <button class="qd-btn" data-offset="7">7 Days Ago</button>
+    </div>
+
+    <div class="date-bar-right">
+      <span class="record-count" id="recordCount">-- records</span>
+      <div class="csv-notice">
+        Saves to <code>exports/</code> folder
+      </div>
+      <button class="db-btn" id="csvBtn">&#128228; Download CSV</button>
+    </div>
+  </div>
+
+  <!-- ── Summary Strip: 4 stat cards ── -->
+  <div class="summary-strip">
+
+    <!-- Temperature -->
+    <div class="sum-card">
+      <div class="sum-card-label">Temperature</div>
+      <div class="sum-card-val temp-color" id="scTempAvg">--</div>
+      <div class="sum-card-sub">Average °C</div>
+      <div class="stat-trio">
+        <div class="stat-trio-item">
+          <div class="stv cyan-color" id="scTempMin">--</div>
+          <div class="stl">Min</div>
+        </div>
+        <div class="stat-trio-item">
+          <div class="stv red-color" id="scTempMax">--</div>
+          <div class="stl">Max</div>
+        </div>
+        <div class="stat-trio-item">
+          <div class="stv dim-color" id="scTempCount">--</div>
+          <div class="stl">Readings</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Humidity -->
+    <div class="sum-card">
+      <div class="sum-card-label">Humidity</div>
+      <div class="sum-card-val cyan-color" id="scHumAvg">--</div>
+      <div class="sum-card-sub">Average %</div>
+      <div class="stat-trio">
+        <div class="stat-trio-item">
+          <div class="stv cyan-color" id="scHumMin">--</div>
+          <div class="stl">Min</div>
+        </div>
+        <div class="stat-trio-item">
+          <div class="stv cyan-color" id="scHumMax">--</div>
+          <div class="stl">Max</div>
+        </div>
+        <div class="stat-trio-item">
+          <div class="stv dim-color" id="scHumCount">--</div>
+          <div class="stl">Readings</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Air Quality -->
+    <div class="sum-card">
+      <div class="sum-card-label">Air Quality Index</div>
+      <div class="sum-card-val green-color" id="scAqiAvg">--</div>
+      <div class="sum-card-sub">Average AQI</div>
+      <div class="stat-trio">
+        <div class="stat-trio-item">
+          <div class="stv green-color" id="scAqiMin">--</div>
+          <div class="stl">Min</div>
+        </div>
+        <div class="stat-trio-item">
+          <div class="stv yellow-color" id="scAqiMax">--</div>
+          <div class="stl">Max</div>
+        </div>
+        <div class="stat-trio-item">
+          <div class="stv dim-color" id="scAqiCount">--</div>
+          <div class="stl">Readings</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Health Score -->
+    <div class="sum-card">
+      <div class="sum-card-label">Env Health Score</div>
+      <div class="sum-card-val cyan-color" id="scHealthVal">--</div>
+      <div class="sum-card-sub" id="scHealthGrade">Overall Grade</div>
+      <div class="stat-trio">
+        <div class="stat-trio-item">
+          <div class="stv" id="scHealthMin">--</div>
+          <div class="stl">Min</div>
+        </div>
+        <div class="stat-trio-item">
+          <div class="stv" id="scHealthMax">--</div>
+          <div class="stl">Max</div>
+        </div>
+        <div class="stat-trio-item">
+          <div class="stv dim-color" id="scTotalRecords">--</div>
+          <div class="stl">Total</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /summary-strip -->
+
+  <!-- ── Charts: Temperature + Humidity side by side ── -->
+  <div class="panels-grid">
+
+    <div class="chart-panel">
+      <div class="panel-head">
+        <div class="panel-title">
+          <span class="panel-dot temp-dot"></span>
+          Temperature Over Time
+        </div>
+        <span class="panel-unit">°C</span>
+      </div>
+      <div class="panel-chart-wrap">
+        <canvas id="dbTempChart"></canvas>
+      </div>
+    </div>
+
+    <div class="chart-panel">
+      <div class="panel-head">
+        <div class="panel-title">
+          <span class="panel-dot hum-dot"></span>
+          Humidity Over Time
+        </div>
+        <span class="panel-unit">%</span>
+      </div>
+      <div class="panel-chart-wrap">
+        <canvas id="dbHumChart"></canvas>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── Chart: AQI full width ── -->
+  <div class="chart-panel">
+    <div class="panel-head">
+      <div class="panel-title">
+        <span class="panel-dot aqi-dot"></span>
+        Air Quality Index Over Time
+      </div>
+      <span class="panel-unit">AQI</span>
+    </div>
+    <div class="panel-chart-wrap">
+      <canvas id="dbAqiChart"></canvas>
+    </div>
+  </div>
+
+  <!-- ── Data Table with Pagination ── -->
+  <div class="table-panel">
+    <div class="panel-head">
+      <div class="panel-title">&#9776; Detailed Records</div>
+      <span class="pg-info" id="tableInfo">--</span>
+    </div>
+
+    <!-- Table rows injected by dashboard.js -->
+    <div id="tableContainer">
+      <div class="state-box">
+        <div class="spinner"></div>
+        Loading data…
+      </div>
+    </div>
+
+    <!-- Pagination buttons injected by dashboard.js -->
+    <div class="pagination" id="pagination"></div>
+  </div>
+
+</div><!-- /db-wrap -->
+
+<!-- Dashboard logic — loaded last so DOM is ready -->
+<script src="dashboard.js"></script>
+
+</body>
+</html>
