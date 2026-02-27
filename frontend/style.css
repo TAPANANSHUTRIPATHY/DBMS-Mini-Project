@@ -98,7 +98,12 @@ header {
   background: rgba(232,244,255,0.85);
 }
 
-.header-left { display: flex; align-items: center; gap: 12px; }
+.header-left {
+  display: flex; align-items: center; gap: 12px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
 
 .logo-mark {
   position: relative; width: 32px; height: 32px;
@@ -118,7 +123,15 @@ header {
 }
 .logo-text .accent { color: var(--cyan); }
 
-.header-center { text-align: center; flex: 1; }
+.header-center {
+  /* True absolute center independent of left/right widths */
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  pointer-events: none;  /* clicks pass through to elements behind */
+  white-space: nowrap;
+}
 
 h1 {
   font-family: 'Orbitron', monospace;
@@ -149,7 +162,7 @@ h1 {
   animation: blink 1.4s ease-in-out infinite;
 }
 
-.header-right { display: flex; align-items: center; gap: 14px; }
+.header-right { display: flex; align-items: center; gap: 14px; flex: 1; justify-content: flex-end; }
 
 /* Theme toggle */
 .theme-btn {
