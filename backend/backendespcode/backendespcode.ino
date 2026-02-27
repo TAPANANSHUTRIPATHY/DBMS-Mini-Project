@@ -10,7 +10,7 @@ const char* ssid = "Saion";
 const char* password = "Saion123";
 
 // Replace with your laptop IP
-const char* serverUrl = "http://10.126.88.33:5000/api/update";
+const char* serverUrl = "https://dbms-mini-project-vgp4.onrender.com/api/update";
 
 DHT dht(DHTPIN, DHTTYPE);
 

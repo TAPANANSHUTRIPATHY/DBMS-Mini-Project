@@ -10,7 +10,7 @@
    Auto-refreshes every 30 s (silent) so today's data grows live.
 ================================================================ */
 
-const API = "http://localhost:5000/api";
+const API = "https://dbms-mini-project-vgp4.onrender.com/api";
 const ROWS_PER_PAGE = 50;
 
 const FONT = "Rajdhani";
