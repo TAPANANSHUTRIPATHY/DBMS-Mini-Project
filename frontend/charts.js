@@ -205,8 +205,10 @@
      MAIN SYNC — polls ENVDATA every 1.5s
   ================================================================ */
   let _lastSyncTs = "";
+  let _syncCount  = 0;
 
   function sync() {
+    _syncCount++;
     const D = window.ENVDATA;
 
     /* Backend offline: clear everything and show "--" */
@@ -219,8 +221,10 @@
     }
 
     const lastTs = D.labels[D.labels.length - 1];
-    if (lastTs === _lastSyncTs) return;  /* no new data */
-    _lastSyncTs = lastTs;
+    /* Always sync humidity + gauges + health even if no new point.
+       Only skip the heavy mirror() calls when truly nothing changed. */
+    const hasNew = (lastTs !== _lastSyncTs);
+    if (hasNew) _lastSyncTs = lastTs;
 
     const { labels, temps, hums, aqis } = D;
     const latestTemp = temps[temps.length - 1];
@@ -229,15 +233,18 @@
 
     if (isNaN(latestTemp) || isNaN(latestHum) || isNaN(latestAqi)) return;
 
-    /* Humidity chart tile */
-    mirror(humLineChart, labels, hums);
+    /* Humidity chart tile — only redraw when new data arrives */
+    if (hasNew) {
+      mirror(humLineChart, labels, hums);
+      mirror(tempLargeChart, labels, temps);
+      mirror(humLargeChart,  labels, hums);
+      mirror(airLargeChart,  labels, aqis);
+      mirror(tempSpk, labels, temps);
+      mirror(humSpk,  labels, hums);
+      mirror(airSpk,  labels, aqis);
+    }
 
-    /* Modal large charts */
-    mirror(tempLargeChart, labels, temps);
-    mirror(humLargeChart,  labels, hums);
-    mirror(airLargeChart,  labels, aqis);
-
-    /* Humidity gauge */
+    /* Humidity gauge — always update so it's responsive */
     if (humGauge) {
       humGauge.data.datasets[0].data = [latestHum, Math.max(0, 100 - latestHum)];
       humGauge.update("none");
@@ -250,12 +257,7 @@
     /* Card backgrounds + bars */
     updateCards(latestTemp, latestHum, latestAqi);
 
-    /* Sparklines */
-    mirror(tempSpk, labels, temps);
-    mirror(humSpk,  labels, hums);
-    mirror(airSpk,  labels, aqis);
-
-    /* Stats badges */
+    /* Stats badges — always refresh */
     const ts = statsOf(temps), hs = statsOf(hums), as = statsOf(aqis);
     ["Min","Avg","Max"].forEach((k,i) => {
       setEl("temp"+k, [ts.min,ts.avg,ts.max][i]);
@@ -269,8 +271,8 @@
     checkAlerts(latestTemp, latestHum, latestAqi);
   }
 
-  setInterval(sync, 1500);
-  setTimeout(sync, 800);
+  setInterval(sync, 1000);  /* match 1s fetchLatest interval */
+  setTimeout(sync, 600);
 
   /* ================================================================
      MODALS

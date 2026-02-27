@@ -33,7 +33,7 @@ exports.getLatestData = async (req, res) => {
 exports.getHistory = async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT * FROM sensor_data ORDER BY created_at ASC LIMIT 20'
+      'SELECT * FROM sensor_data ORDER BY created_at ASC'
     );
 
     res.json(result.rows);
