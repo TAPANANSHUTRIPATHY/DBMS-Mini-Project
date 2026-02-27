@@ -7,7 +7,7 @@
    • MAX_PTS = 120 → 2 minutes of 1-second data visible at once
 ================================================================ */
 
-const API_URL = "http://localhost:5000/api";
+const API_URL = "https://dbms-mini-project-vgp4.onrender.com/api";
 const MAX_PTS = 120;   /* 2 min of live points at 1s interval */
 
 /* ── Shared data bus ── */
