@@ -70,7 +70,7 @@ This project demonstrates end-to-end engineering across:
   - Temperature over time (red fill area)
   - Humidity over time (cyan fill area)
   - Air Quality Index over time (green fill area)
-- 🎛️ **Sensor Gauges** — 3 arc-style gauges at the bottom for Temperature, Humidity, and AQI with intuitive color coding
+- 🎛️ **Sensor Gauges** — 3 arc-style gauges at the bottom for Temperature, Humidity, and AQI with color coding
 
 ---
 
@@ -91,9 +91,7 @@ This project demonstrates end-to-end engineering across:
 - 📈 **Temperature Over Time** graph (red)
 - 📈 **Humidity Over Time** graph (cyan)
 - 📈 **Air Quality Index Over Time** graph (green) — full width, clearly showing AQI drop from ~6000 → stabilizing ~1400 over time
-- 📋 **Detailed Records Table** — Paginated (Page 1 of 5, showing 1–50 of **396 records**) with columns:
-  - `#`, `Time`, `Temperature`, `Humidity`, `Air Quality`, `Health Score`
-  - Color-coded AQI badges: 🔴 Poor / 🟡 Moderate / 🟢 Good
+- 📋 **Detailed Records Table** — Paginated (Page 1 of 5, showing 1–50 of **396 records**) with columns: `#`, `Time`, `Temperature`, `Humidity`, `Air Quality`, `Health Score` with color-coded AQI badges: 🔴 Poor / 🟡 Moderate / 🟢 Good
 
 ---
 
@@ -157,16 +155,15 @@ DBMS-Mini-Project/
 │   │     └── sensorRoutes-test.js
 │   ├── controllers/
 │   │     └── sensorController-test.js
-│   └── results/                # 📸 Database test verification screenshots
+│   └── results/                # 📸 pgAdmin database verification screenshots
+│       ├── pg_admin_backend_test_DHT_11_temperature_graph.png
+│       ├── pg_admin_backend_test_DHT_11_humidity_graph.png
+│       └── pg_admin_backend_test_MQ135_air_quality_graph.png
 │
 ├── CSV Files/                  # 📊 Exported sensor data CSV files
-│
 ├── Database Scripts/           # 🗄️ SQL scripts for schema setup
-│
 ├── DBMS Project SS/            # 🖼️ Project screenshots collection
-│
 ├── Docs/                       # 📄 Project documentation
-│
 ├── ESP 32 Codes/               # 🔌 All ESP32 Arduino sketches
 │
 ├── frontend/                   # 🎨 Netlify deployed dashboard
@@ -189,8 +186,6 @@ DBMS-Mini-Project/
 └── README.md
 ```
 
-> 💡 **To add screenshots:** Place the two frontend screenshots in a `screenshots/` folder in the repo root so they render correctly in this README.
-
 ---
 
 ## 🌿 Branch Structure
@@ -208,7 +203,7 @@ The project follows a structured **phase-based branching strategy**, with each b
 | `phase-2-UI-Update` | 2 days ago | — | Frontend UI initial update |
 | `phase-1-backend-test` | 2 days ago | — | Backend test and database validation |
 
-> **Branching convention:** Each branch maps 1:1 to a project phase, making development history fully traceable and reviewable via GitHub pull requests.
+> **Branching convention:** Each branch maps 1:1 to a project phase, making the full development history traceable and reviewable via GitHub pull requests.
 
 ---
 
@@ -222,12 +217,11 @@ Focused on validating the full sensor-to-database pipeline in isolation before c
 - Sensor integration with ESP32
 - WiFi communication verification
 - JSON transmission testing
-- Database insertion validation
-- PostgreSQL query verification
+- Database insertion and query validation via pgAdmin 4
 
 **Test Architecture:**
 ```
-ESP32  →  backend-test (Node.js @ Port 6000)  →  PostgreSQL (iot_test_env)
+ESP32  →  backend-test (Node.js @ Port 6000)  →  PostgreSQL (iot-test-env)
 ```
 
 **Test Database Schema:**
@@ -250,19 +244,41 @@ CREATE TABLE sensor_test_data (
 }
 ```
 
-**Phase 1 Verification Results:**
+---
 
-| Metric | Location |
-|--------|---------|
-| 🌡️ Temperature Data | `backend-test/results/` |
-| 💧 Humidity Data | `backend-test/results/` |
-| 🌫️ Air Quality Data | `backend-test/results/` |
+### 📊 Phase 1 — pgAdmin Database Verification
+
+All three sensor metrics were verified live in **pgAdmin 4** connected to `iot-test-env` PostgreSQL 18, running `SELECT * FROM sensor_test_data` (56 total rows, query completed in 0.151s).
+
+---
+
+#### 🌡️ Temperature Data — Line Chart (pgAdmin Graph Visualiser)
+
+![Temperature Graph](backend-test/results/pgadminbackendtestDHT11temperaturegraph.png)
+
+> DHT11 temperature readings plotted as a **Line Chart** (Y Axis: `temperature`, X Axis: `id`). The line stays consistently flat between **27–30°C** across all 56 rows, confirming stable sensor readings from the ESP32 in the test environment.
+
+---
+
+#### 💧 Humidity Data — Bar Chart (pgAdmin Graph Visualiser)
+
+![Humidity Graph](backend-test/results/pgadminbackendtestDHT11humiditygraph.png)
+
+> DHT11 humidity readings plotted as a **Bar Chart** (Y Axis: `humidity`, X Axis: `id`). Values vary between **45–82%** across 56 records, with visible spikes around rows 22–26 and 36–40, demonstrating real environmental humidity fluctuation captured by the sensor.
+
+---
+
+#### 🌫️ Air Quality Data — Bar Chart (pgAdmin Graph Visualiser)
+
+![Air Quality Graph](backend-test/results/pgadminbackendtestMQ135airqualitygraph.png)
+
+> MQ135 air quality readings plotted as a **Bar Chart** (Y Axis: `air_quality`, X Axis: `id`). Values range from **~1200 to ~1900**, with a prominent spike around rows 20–22 reaching near 2000, confirming the MQ135 sensor is detecting real air quality variations and the data pipeline is fully functional end-to-end.
 
 ---
 
 ### 🔵 Phase 2–3 — UI Development
 
-Initial frontend dashboard built with HTML5, CSS3, and Chart.js, iterated across two phases.
+Initial and updated frontend dashboard built with HTML5, CSS3, and Chart.js across two iteration phases.
 
 ---
 
