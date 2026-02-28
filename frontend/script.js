@@ -27,9 +27,16 @@ const airGaugeValue  = document.getElementById("airGaugeValue");
 
 /* ── AQI status ── */
 function getAirStatus(v) {
-  if (v < 1000) return { text: "🟢 Clean",    color: "#00ff88" };
-  if (v < 2000) return { text: "🟡 Moderate", color: "#ffcc00" };
-  return            { text: "🔴 Poor",      color: "#ff4d4d" };
+  if (v <= 50) {
+    return { text: "🟢 Good", color: "#00ff88" };
+  }
+  if (v <= 100) {
+    return { text: "🟡 Moderate", color: "#ffcc00" };
+  }
+  if (v <= 200) {
+    return { text: "🟠 Unhealthy", color: "#ff8800" };
+  }
+  return { text: "🔴 Hazardous", color: "#ff4d4d" };
 }
 
 /* ── Show "--" on all cards when offline ── */
