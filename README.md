@@ -480,7 +480,8 @@ Wait 5 Seconds → LOOP ↑
 | 🟢 Phase 4 | Production Backend | ✅ Complete |
 | 🟢 Phase 5–6 | Cloud Deployment | ✅ Complete |
 | 🟢 Phase 7–8 | Frontend + Netlify Integration | ✅ Complete |
-| 🟡 Phase 9 | Advanced Analytics & ML | 🔄 Planned |
+| 🟢 Phase 9 | Frontend Improvemnets & Sensor Calibrations | On Progress |
+| 🟡 Phase 10 | Advanced Analytics & ML | 🔄 Planned |
 
 ---
 
