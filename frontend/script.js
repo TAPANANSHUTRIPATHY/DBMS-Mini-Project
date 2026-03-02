@@ -8,7 +8,7 @@
 ================================================================ */
 
 const API_URL = "https://dbms-mini-project-vgp4.onrender.com/api";
-const MAX_PTS = 120;   /* 2 min of live points at 1s interval */
+const MAX_PTS = 20;   /* Show last 20 readings of 1s interval */
 
 /* ── Shared data bus ── */
 window.ENVDATA = {
@@ -33,10 +33,16 @@ function getAirStatus(v) {
   if (v <= 100) {
     return { text: "🟡 Moderate", color: "#ffcc00" };
   }
-  if (v <= 200) {
-    return { text: "🟠 Unhealthy", color: "#ff8800" };
+  if (v <= 150) {
+    return { text: "🟠 Unhealthy for Sensitive", color: "#ff9900" };
   }
-  return { text: "🔴 Hazardous", color: "#ff4d4d" };
+  if (v <= 200) {
+    return { text: "🔴 Unhealthy", color: "#ff4d4d" };
+  }
+  if (v <= 300) {
+    return { text: "🟣 Very Unhealthy", color: "#cc0099" };
+  }
+  return { text: "🟤 Hazardous", color: "#800000" };
 }
 
 /* ── Show "--" on all cards when offline ── */
@@ -93,21 +99,7 @@ function makeLineChart(id, label, color, yMin, yMax, yStep) {
 }
 
 tempChart = makeLineChart("tempHumChart", "Temperature (°C)", "rgb(255,77,77)",  -10,  60,   5);
-airChart  = makeLineChart("airChart",     "Air Quality",      "rgb(0,255,136)",    0, 3000, 250);
-
-function makeGauge(id, color, maxVal) {
-  const el = document.getElementById(id);
-  if (!el) return null;
-  return new Chart(el.getContext("2d"), {
-    type: "doughnut",
-    data: { datasets: [{ data: [0, maxVal], backgroundColor: [color, "#1e293b"], borderWidth: 0 }] },
-    options: { rotation: -90, circumference: 180, cutout: "75%",
-      animation: false, plugins: { legend: { display: false } } },
-  });
-}
-
-tempGauge = makeGauge("tempGauge", "#ff4d4d", 70);
-airGauge  = makeGauge("airGauge",  "#00ff88", 3000);
+airChart  = makeLineChart("airChart",     "Air Quality",      "rgb(0,255,136)",    0, 500, 50);
 
 /* ================================================================
    APPEND ONE POINT to the live sliding window
@@ -161,19 +153,8 @@ async function fetchLatest() {
     if (airCard)     airCard.style.boxShadow = `0 0 30px ${status.color}`;
 
     /* Gauges */
-    if (tempGauge) {
-      const pct = Math.min(Math.max(temp + 10, 0), 70);
-      tempGauge.data.datasets[0].data = [pct, 70 - pct];
-      tempGauge.update();
-    }
     if (tempGaugeValue) tempGaugeValue.textContent = temp.toFixed(1) + " °C";
 
-    if (airGauge) {
-      const safeAqi = Math.min(Math.max(aqi, 0), 3000);
-      airGauge.data.datasets[0].data = [safeAqi, 3000 - safeAqi];
-      airGauge.data.datasets[0].backgroundColor[0] = status.color;
-      airGauge.update();
-    }
     if (airGaugeValue) airGaugeValue.textContent = aqi;
 
     window.ENVDATA.latest        = d;
