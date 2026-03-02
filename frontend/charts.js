@@ -252,6 +252,9 @@
       mirror(airSpk, labels, aqis);
     }
 
+    /* Health ring — MUST be called every sync */
+    updateHealth(latestTemp, latestHum, latestAqi);
+
     /* Card backgrounds + bars */
     updateCards(latestTemp, latestHum, latestAqi);
 
@@ -267,6 +270,79 @@
     });
 
     checkAlerts(latestTemp, latestHum, latestAqi);
+
+    /* Smart Recommendations */
+    updateRecommendations(latestTemp, latestHum, latestAqi);
+  }
+
+  /* ================================================================
+     SMART RECOMMENDATIONS ENGINE 🤖
+     Rule-based decision support system
+  ================================================================ */
+  function updateRecommendations(temp, hum, aqi) {
+    const panel = document.getElementById("smartRecommendations");
+    if (!panel) return;
+
+    const tips = [];
+
+    /* ── AQI-based rules ── */
+    if (aqi > 300) {
+      tips.push({ icon: "🚨", text: "HAZARDOUS air! Stay indoors, seal windows and doors.", severity: "critical" });
+      tips.push({ icon: "😷", text: "Wear N95 mask if you must go outside.", severity: "critical" });
+      tips.push({ icon: "🫁", text: "Run air purifiers at maximum. Avoid all exertion.", severity: "critical" });
+    } else if (aqi > 200) {
+      tips.push({ icon: "🔴", text: "Very unhealthy air — avoid all outdoor activities.", severity: "danger" });
+      tips.push({ icon: "😷", text: "Wear a mask outdoors. Keep windows closed.", severity: "danger" });
+      tips.push({ icon: "🏠", text: "Turn on air purifier indoors.", severity: "danger" });
+    } else if (aqi > 150) {
+      tips.push({ icon: "🟠", text: "Unhealthy air — limit prolonged outdoor exertion.", severity: "warning" });
+      tips.push({ icon: "🪟", text: "Close windows and avoid ventilation from outside.", severity: "warning" });
+      tips.push({ icon: "😷", text: "Sensitive groups should wear masks outdoors.", severity: "warning" });
+    } else if (aqi > 100) {
+      tips.push({ icon: "🟡", text: "Moderate air — sensitive individuals should limit outdoor exposure.", severity: "info" });
+    } else {
+      tips.push({ icon: "🟢", text: "Air quality is good — enjoy outdoor activities!", severity: "good" });
+    }
+
+    /* ── Temperature-based rules ── */
+    if (temp > 40) {
+      tips.push({ icon: "🥵", text: `Extreme heat (${temp.toFixed(1)}°C)! Stay hydrated, avoid sunlight.`, severity: "critical" });
+    } else if (temp > 35) {
+      tips.push({ icon: "🌡️", text: `High temperature (${temp.toFixed(1)}°C) — drink water frequently.`, severity: "warning" });
+    } else if (temp < 5) {
+      tips.push({ icon: "🥶", text: `Very cold (${temp.toFixed(1)}°C) — wear warm layers.`, severity: "warning" });
+    } else if (temp < 15) {
+      tips.push({ icon: "🧥", text: `Cool conditions (${temp.toFixed(1)}°C) — consider a jacket.`, severity: "info" });
+    }
+
+    /* ── Humidity-based rules ── */
+    if (hum > 85) {
+      tips.push({ icon: "💧", text: `Very high humidity (${hum.toFixed(1)}%) — risk of mold, use dehumidifier.`, severity: "warning" });
+    } else if (hum < 20) {
+      tips.push({ icon: "🏜️", text: `Very dry air (${hum.toFixed(1)}%) — use a humidifier, stay hydrated.`, severity: "warning" });
+    }
+
+    /* ── Combined rules ── */
+    if (temp > 30 && hum > 70) {
+      tips.push({ icon: "⚠️", text: "High heat + humidity — heat index is dangerously high!", severity: "danger" });
+    }
+
+    /* Render */
+    const severityColors = {
+      critical: { bg: "rgba(255,0,0,0.08)", border: "rgba(255,77,77,0.5)", text: "#ff4d4d" },
+      danger: { bg: "rgba(255,77,77,0.06)", border: "rgba(255,77,77,0.35)", text: "#ff6b6b" },
+      warning: { bg: "rgba(255,204,0,0.06)", border: "rgba(255,204,0,0.35)", text: "#ffcc00" },
+      info: { bg: "rgba(0,229,255,0.06)", border: "rgba(0,229,255,0.25)", text: "#00e5ff" },
+      good: { bg: "rgba(0,255,136,0.06)", border: "rgba(0,255,136,0.25)", text: "#00ff88" },
+    };
+
+    panel.innerHTML = tips.map(t => {
+      const c = severityColors[t.severity] || severityColors.info;
+      return `<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:10px;background:${c.bg};border:1px solid ${c.border};margin-bottom:8px;transition:all 0.3s ease;">
+        <span style="font-size:22px;flex-shrink:0;">${t.icon}</span>
+        <span style="color:${c.text};font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:500;line-height:1.4;">${t.text}</span>
+      </div>`;
+    }).join("");
   }
 
   setInterval(sync, 1000);  /* match 1s fetchLatest interval */

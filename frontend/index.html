@@ -29,7 +29,7 @@
         </svg>
       </div>
       <div class="logo-text">ENV<span class="accent">CORE</span></div>
-      <div class="location-badge" style="cursor:pointer;" onclick="openModal('locationModal')" title="Set Location">
+      <div class="location-badge clickable" onclick="openModal('locationModal')" title="Set Location">
         <svg id="locationIcon" class="loc-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
           stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" />
@@ -214,6 +214,17 @@
 
   </div>
 
+  <!-- SMART RECOMMENDATIONS -->
+  <div class="section-label"><span>SMART RECOMMENDATIONS 🤖</span></div>
+  <div class="recommendations-panel">
+    <div id="smartRecommendations">
+      <div class="loading-recommendation">
+        <span class="loading-icon">⏳</span>
+        <span class="loading-text">Waiting for sensor data to generate recommendations...</span>
+      </div>
+    </div>
+  </div>
+
   <!-- REAL-TIME ANALYTICS -->
   <div class="section-label"><span>REAL-TIME ANALYTICS</span></div>
   <div class="graph-tiles">
@@ -299,20 +310,16 @@
   </div>
 
   <div id="locationModal" class="modal" onclick="if(event.target===this)closeModal('locationModal')">
-    <div class="modal-content" style="max-width:400px; padding: 25px;">
-      <div class="modal-head" style="margin-bottom: 20px;">
+    <div class="modal-content location-modal-content">
+      <div class="modal-head location-modal-head">
         <h3 class="modal-title">Set Location</h3>
         <span class="close" onclick="closeModal('locationModal')">&#10005;</span>
       </div>
-      <div style="display:flex; flex-direction:column; gap:15px;">
-        <input type="text" id="manualLocation" placeholder="Enter city/location manually"
-          style="padding:12px; border-radius:6px; border:1px solid rgba(255,255,255,0.1); background:rgba(0,0,0,0.3); color:white; font-family:'Rajdhani', sans-serif; font-size:16px;">
-        <button onclick="saveManualLocation()"
-          style="padding:12px; border-radius:6px; background:rgba(0,255,136,0.15); border:1px solid rgba(0,255,136,0.5); color:#00ff88; cursor:pointer; font-weight:600; text-transform:uppercase;">Save
-          Custom Location</button>
-        <div style="text-align:center; color:rgba(255,255,255,0.5); font-size:14px;">&mdash; OR &mdash;</div>
-        <button onclick="useGPSLocation()"
-          style="padding:12px; border-radius:6px; background:rgba(0,229,255,0.15); border:1px solid rgba(0,229,255,0.5); color:#00e5ff; cursor:pointer; font-weight:600; text-transform:uppercase; display:flex; align-items:center; justify-content:center; gap:8px;">
+      <div class="location-modal-body">
+        <input type="text" id="manualLocation" placeholder="Enter city/location manually" class="location-input">
+        <button onclick="saveManualLocation()" class="location-btn save-btn">Save Custom Location</button>
+        <div class="location-divider">&mdash; OR &mdash;</div>
+        <button onclick="useGPSLocation()" class="location-btn gps-btn">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" />
             <circle cx="12" cy="9" r="2.5" />
