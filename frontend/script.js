@@ -8,7 +8,7 @@
 ================================================================ */
 
 const API_URL = "https://dbms-mini-project-vgp4.onrender.com/api";
-const MAX_PTS = 20;   /* Show last 20 readings of 1s interval */
+const MAX_PTS = 40;   /* Show last 20 readings of 1s interval */
 
 /* ── Shared data bus ── */
 window.ENVDATA = {
