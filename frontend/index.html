@@ -11,7 +11,7 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Rajdhani:wght@300;400;500;600&display=swap"
     rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
 </head>
 
 <body>
@@ -29,7 +29,7 @@
         </svg>
       </div>
       <div class="logo-text">ENV<span class="accent">CORE</span></div>
-      <div class="location-badge clickable" onclick="openModal('locationModal')" title="Set Location">
+      <div class="location-badge clickable" id="locationBadge" title="Set Location">
         <svg id="locationIcon" class="loc-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
           stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" />
@@ -62,8 +62,7 @@
   <div id="alertBanner" class="alert-banner hidden">
     <span class="alert-icon">&#9888;</span>
     <span id="alertText"></span>
-    <button class="alert-close"
-      onclick="document.getElementById('alertBanner').classList.add('hidden')">&#10005;</button>
+    <button class="alert-close" id="alertClose">&#10005;</button>
   </div>
 
   <!-- HEALTH RING -->
@@ -219,19 +218,19 @@
   <!-- FULL DAY MASTER GRAPH -->
   <div class="section-label"><span>TODAY'S MASTER GRAPH (00:00 - 23:59)</span></div>
   <div class="graph-tiles">
-    <div class="tile" id="tileMasterGraph" style="grid-column: 1 / -1;">
+    <div class="tile tile-full-width" id="tileMasterGraph">
       <div class="tile-header">
         <div class="tile-title-group">
           <span class="tile-dot temp-c"></span>
           <span class="tile-dot hum-c"></span>
-          <span class="tile-dot" style="background:#00ff88;box-shadow:0 0 6px #00ff88;"></span>
+          <span class="tile-dot aqi-dot"></span>
           <h3>Full Day Sensor Master Graph — From DB</h3>
         </div>
         <div class="tile-actions">
-          <button class="fullscreen-btn" onclick="openMasterModal()" title="Fullscreen">&#10559;</button>
+          <button class="fullscreen-btn" id="masterFullscreenBtn" title="Fullscreen">&#10559;</button>
         </div>
       </div>
-      <div class="tile-chart-wrap" style="height: 280px;"><canvas id="masterForeChart"></canvas></div>
+      <div class="tile-chart-wrap master-chart-wrap"><canvas id="masterForeChart"></canvas></div>
     </div>
   </div>
 
@@ -248,7 +247,7 @@
           <span class="ts min">&#8595;<span id="tTempMin">--</span></span>
           <span class="ts avg">~<span id="tTempAvg">--</span></span>
           <span class="ts max">&#8593;<span id="tTempMax">--</span></span>
-          <button class="fullscreen-btn" onclick="openModal('tempModal')">&#10559;</button>
+          <button class="fullscreen-btn" id="tempFullscreenBtn">&#10559;</button>
         </div>
       </div>
       <div class="tile-chart-wrap"><canvas id="tempHumChart"></canvas></div>
@@ -263,7 +262,7 @@
           <span class="ts min">&#8595;<span id="tHumMin">--</span></span>
           <span class="ts avg">~<span id="tHumAvg">--</span></span>
           <span class="ts max">&#8593;<span id="tHumMax">--</span></span>
-          <button class="fullscreen-btn" onclick="openModal('humModal')">&#10559;</button>
+          <button class="fullscreen-btn" id="humFullscreenBtn">&#10559;</button>
         </div>
       </div>
       <div class="tile-chart-wrap"><canvas id="humLineChart"></canvas></div>
@@ -278,7 +277,7 @@
           <span class="ts min">&#8595;<span id="tAqiMin">--</span></span>
           <span class="ts avg">~<span id="tAqiAvg">--</span></span>
           <span class="ts max">&#8593;<span id="tAqiMax">--</span></span>
-          <button class="fullscreen-btn" onclick="openModal('airModal')">&#10559;</button>
+          <button class="fullscreen-btn" id="airFullscreenBtn">&#10559;</button>
         </div>
       </div>
       <div class="tile-chart-wrap"><canvas id="airChart"></canvas></div>
@@ -324,57 +323,57 @@
 
 
   <!-- MODALS -->
-  <div id="tempModal" class="modal" onclick="if(event.target===this)closeModal('tempModal')">
+  <div id="tempModal" class="modal">
     <div class="modal-content">
       <div class="modal-head">
         <h3 class="modal-title">Temperature &mdash; Full View</h3>
-        <span class="close" onclick="closeModal('tempModal')">&#10005;</span>
+        <span class="close" data-modal="tempModal">&#10005;</span>
       </div>
       <div class="modal-chart-wrap"><canvas id="tempLargeCanvas"></canvas></div>
     </div>
   </div>
 
-  <div id="humModal" class="modal" onclick="if(event.target===this)closeModal('humModal')">
+  <div id="humModal" class="modal">
     <div class="modal-content">
       <div class="modal-head">
         <h3 class="modal-title">Humidity &mdash; Full View</h3>
-        <span class="close" onclick="closeModal('humModal')">&#10005;</span>
+        <span class="close" data-modal="humModal">&#10005;</span>
       </div>
       <div class="modal-chart-wrap"><canvas id="humLargeCanvas"></canvas></div>
     </div>
   </div>
 
-  <div id="airModal" class="modal" onclick="if(event.target===this)closeModal('airModal')">
+  <div id="airModal" class="modal">
     <div class="modal-content">
       <div class="modal-head">
         <h3 class="modal-title">Air Quality Index &mdash; Full View</h3>
-        <span class="close" onclick="closeModal('airModal')">&#10005;</span>
+        <span class="close" data-modal="airModal">&#10005;</span>
       </div>
       <div class="modal-chart-wrap"><canvas id="airLargeCanvas"></canvas></div>
     </div>
   </div>
 
-  <div id="masterModal" class="modal" onclick="if(event.target===this)closeModal('masterModal')">
-    <div class="modal-content" style="max-width:1100px;">
+  <div id="masterModal" class="modal">
+    <div class="modal-content modal-content-wide">
       <div class="modal-head">
         <h3 class="modal-title">Full Day Sensor Master Graph &mdash; Full View</h3>
-        <span class="close" onclick="closeModal('masterModal')">&#10005;</span>
+        <span class="close" data-modal="masterModal">&#10005;</span>
       </div>
-      <div class="modal-chart-wrap" style="height:500px;"><canvas id="masterLargeCanvas"></canvas></div>
+      <div class="modal-chart-wrap modal-chart-tall"><canvas id="masterLargeCanvas"></canvas></div>
     </div>
   </div>
 
-  <div id="locationModal" class="modal" onclick="if(event.target===this)closeModal('locationModal')">
+  <div id="locationModal" class="modal">
     <div class="modal-content location-modal-content">
       <div class="modal-head location-modal-head">
         <h3 class="modal-title">Set Location</h3>
-        <span class="close" onclick="closeModal('locationModal')">&#10005;</span>
+        <span class="close" data-modal="locationModal">&#10005;</span>
       </div>
       <div class="location-modal-body">
         <input type="text" id="manualLocation" placeholder="Enter city/location manually" class="location-input">
-        <button onclick="saveManualLocation()" class="location-btn save-btn">Save Custom Location</button>
+        <button id="saveLocationBtn" class="location-btn save-btn">Save Custom Location</button>
         <div class="location-divider">&mdash; OR &mdash;</div>
-        <button onclick="useGPSLocation()" class="location-btn gps-btn">
+        <button id="gpsLocationBtn" class="location-btn gps-btn">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" />
             <circle cx="12" cy="9" r="2.5" />
@@ -388,14 +387,10 @@
   <!-- TOAST POPUP CONTAINER -->
   <div id="toastContainer"></div>
 
-
-
-  <!-- Expose API URL globally for forecast.js -->
-  <script>window._ENVCORE_API_URL = "https://dbms-mini-project-vgp4.onrender.com/api";</script>
-  <script src="location.js"></script>
-  <script src="script.js"></script>
-  <script src="charts.js"></script>
-  <script src="forecast.js"></script>
+  <script src="location.js" defer></script>
+  <script src="script.js" defer></script>
+  <script src="charts.js" defer></script>
+  <script src="forecast.js" defer></script>
 </body>
 
 </html>

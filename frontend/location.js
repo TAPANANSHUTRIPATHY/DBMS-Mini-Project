@@ -28,7 +28,7 @@ function updateLocationDisplay(name, lat, lon) {
     // Update dashboard header if present
     const h1 = document.querySelector(".header-center h1");
     if (h1 && window.location.pathname.includes("dashboard")) {
-        h1.innerHTML = `Historical Data &mdash; <span style="color:#00e5ff">${name}</span>`;
+        h1.innerHTML = `Historical Data &mdash; <span class="loc-name-accent">${name}</span>`;
     }
 }
 
@@ -44,7 +44,7 @@ function setupAutocomplete() {
         dropdown = document.createElement("div");
         dropdown.id = "locationDropdown";
         dropdown.className = "location-dropdown";
-        input.parentNode.style.position = "relative";
+        input.parentNode.classList.add("location-input-wrap");  /* CSS class instead of inline style */
         input.parentNode.insertBefore(dropdown, input.nextSibling);
     }
 
@@ -120,18 +120,16 @@ function setupAutocomplete() {
     });
 }
 
-window.saveManualLocation = function () {
+function saveManualLocation() {
     const val = document.getElementById("manualLocation")?.value.trim();
     if (!val) return;
     const dropdown = document.getElementById("locationDropdown");
     if (dropdown) dropdown.style.display = "none";
     updateLocationDisplay(val);
-    if (typeof closeModal === "function") {
-        closeModal("locationModal");
-    }
-};
+    window.closeModal?.("locationModal");
+}
 
-window.useGPSLocation = function () {
+function useGPSLocation() {
     const disp = document.getElementById("locationDisplay");
     const icon = document.getElementById("locationIcon");
     if (!disp) return;
@@ -161,12 +159,12 @@ window.useGPSLocation = function () {
                     const name = uniqueParts.join(", ") || "Unknown Location";
 
                     updateLocationDisplay(name, lat, lng);
-                    if (typeof closeModal === "function") closeModal("locationModal");
+                    window.closeModal?.("locationModal");
                 }).catch(() => updateLocationDisplay("Unavailable", lat, lng));
         },
         () => { updateLocationDisplay("GPS Denied/Unavailable"); }
     );
-};
+}
 
 /* Auto-initialize on page load */
 document.addEventListener("DOMContentLoaded", () => {
@@ -175,11 +173,15 @@ document.addEventListener("DOMContentLoaded", () => {
     if (saved && savedLat) {
         updateLocationDisplay(saved, localStorage.getItem("user_lat"), localStorage.getItem("user_lon"));
     } else if (saved) {
-        updateLocationDisplay(saved); // backwards compatibility if lat/lon not saved previously
+        updateLocationDisplay(saved);
     } else if (document.getElementById("locationDisplay")) {
-        window.useGPSLocation();
+        useGPSLocation();
     }
 
-    // Wire up autocomplete
+    /* Wire up autocomplete */
     setupAutocomplete();
+
+    /* Wire location modal buttons (replaces inline onclick= in HTML) */
+    document.getElementById("saveLocationBtn")?.addEventListener("click", saveManualLocation);
+    document.getElementById("gpsLocationBtn")?.addEventListener("click", useGPSLocation);
 });

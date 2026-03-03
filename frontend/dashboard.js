@@ -1,30 +1,52 @@
 /* ================================================================
-   dashboard.js  — ENVCORE Historical Dashboard
+   dashboard.js — ENVCORE Historical Dashboard
    
-   ROOT CAUSE FIX: /api/history returns only ~12 rows by default.
-   We defeat this by trying every known URL pattern that removes
-   the server-side limit, then falling back to paginating the
-   API ourselves (?page=1,2,3…) until we have all records,
-   then filtering client-side by the selected date.
-   
+   OPTIMIZATIONS vs original:
+   1. Parallel fetch: all endpoints raced via Promise.any() → first
+      successful response wins, eliminating sequential 10s timeouts.
+   2. Raw data cache (60s TTL): switching dates or auto-refresh reuses
+      previously fetched data without new network calls.
+   3. animation: false on all existing charts for instant rendering.
+   4. 24HR Master Chart: fixed 00:00–23:00 axis, date-aware,
+      null gaps show as line breaks (spanGaps: false).
+
    Auto-refreshes every 30 s (silent) so today's data grows live.
 ================================================================ */
 
-const API = "https://dbms-mini-project-vgp4.onrender.com/api";
+const API_DB = "https://dbms-mini-project-vgp4.onrender.com/api";
 const ROWS_PER_PAGE = 50;
-
 const FONT = "Rajdhani";
 const TICK = "rgba(200,232,255,0.72)";
 const GRID = "rgba(255,255,255,0.06)";
+
+/* Fixed 24-hour X-axis labels */
+const HOURS_24 = Array.from({ length: 24 }, (_, h) => `${String(h).padStart(2, "0")}:00`);
+
+const COLORS = {
+  temp: "rgb(255,128,128)",
+  hum: "rgb(0,229,255)",
+  aqi: "rgb(0,255,136)",
+};
+
+function rgba(c, a) { return c.replace("rgb(", "rgba(").replace(")", `,${a})`); }
 
 let allData = [];
 let currentPage = 1;
 let selectedDate = todayStr();
 let refreshTimer = null;
 
+/* ── Chart instances ── */
 let dbTempChart = null;
 let dbHumChart = null;
 let dbAqiChart = null;
+let db24hrChart = null;
+
+/* ================================================================
+   RAW DATA CACHE  — avoid re-fetching within 60 s
+================================================================ */
+let _cachedRaw = null;
+let _cacheExpiry = 0;    /* epoch ms */
+const CACHE_TTL = 60000; /* 60 s */
 
 /* ================================================================
    UTILITIES
@@ -36,7 +58,6 @@ function todayStr() {
 
 function p2(n) { return String(n).padStart(2, "0"); }
 
-/* Convert any ISO / postgres timestamp → local YYYY-MM-DD */
 function localDate(isoStr) {
   const d = new Date(isoStr);
   return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
@@ -59,12 +80,14 @@ function healthScore(t, h, a) {
     Math.max(0, 100 - Math.abs(h - 50) * 2) +
     Math.max(0, 100 - (a / 500) * 100)) / 3);
 }
+
 function aqiBadge(v) {
-  if (v <= 50) return `<span class="badge-aqi badge-clean" style="color:#00ff88;">Good</span>`;
-  if (v <= 100) return `<span class="badge-aqi badge-moderate" style="color:#ffcc00;">Moderate</span>`;
-  if (v <= 200) return `<span class="badge-aqi badge-poor" style="color:#ff8800;">Unhealthy</span>`;
-  return `<span class="badge-aqi badge-poor" style="color:#ff4d4d;">Hazardous</span>`;
+  if (v <= 50) return `<span class="badge-aqi badge-clean">Good</span>`;
+  if (v <= 100) return `<span class="badge-aqi badge-moderate">Moderate</span>`;
+  if (v <= 200) return `<span class="badge-aqi badge-poor">Unhealthy</span>`;
+  return `<span class="badge-aqi badge-poor" style="color:#ff4d4d">Hazardous</span>`;
 }
+
 function hColor(s) {
   if (s >= 80) return "#00ff88";
   if (s >= 60) return "#00e5ff";
@@ -75,10 +98,10 @@ function hColor(s) {
 /* ================================================================
    CHART INIT
 ================================================================ */
-function buildChart(id, label, color, yMin, yMax, yStep) {
+function buildLineChart(id, label, color, yMin, yMax, yStep) {
   const el = document.getElementById(id);
   if (!el) return null;
-  const fill = color.replace("rgb(", "rgba(").replace(")", ",0.13)");
+  const fill = rgba(color, 0.13);
   return new Chart(el.getContext("2d"), {
     type: "line",
     data: {
@@ -89,7 +112,8 @@ function buildChart(id, label, color, yMin, yMax, yStep) {
       }]
     },
     options: {
-      responsive: true, maintainAspectRatio: false, animation: { duration: 400 },
+      responsive: true, maintainAspectRatio: false,
+      animation: false,   /* instant render — no animation delay */
       plugins: {
         legend: { labels: { color: TICK, font: { family: FONT, size: 13 }, boxWidth: 26, padding: 12 } },
         tooltip: {
@@ -110,90 +134,144 @@ function buildChart(id, label, color, yMin, yMax, yStep) {
   });
 }
 
-dbTempChart = buildChart("dbTempChart", "Temperature (°C)", "rgb(255,128,128)", -10, 60, 5);
-dbHumChart = buildChart("dbHumChart", "Humidity (%)", "rgb(0,229,255)", 0, 100, 5);
-dbAqiChart = buildChart("dbAqiChart", "Air Quality", "rgb(0,255,136)", 0, 500, 50);
+function build24hrChart(id) {
+  const el = document.getElementById(id);
+  if (!el) return null;
+  return new Chart(el.getContext("2d"), {
+    type: "line",
+    data: {
+      labels: HOURS_24,
+      datasets: [
+        {
+          label: "Temperature (°C)", borderColor: COLORS.temp,
+          backgroundColor: rgba(COLORS.temp, 0.08),
+          data: new Array(24).fill(null),
+          tension: 0.4, pointRadius: 3, pointHoverRadius: 6,
+          borderWidth: 2.5, yAxisID: "y", fill: false, spanGaps: false,
+        },
+        {
+          label: "Humidity (%)", borderColor: COLORS.hum,
+          backgroundColor: rgba(COLORS.hum, 0.08),
+          data: new Array(24).fill(null),
+          tension: 0.4, pointRadius: 3, pointHoverRadius: 6,
+          borderWidth: 2.5, yAxisID: "y1", fill: false, spanGaps: false,
+        },
+        {
+          label: "Air Quality Index", borderColor: COLORS.aqi,
+          backgroundColor: rgba(COLORS.aqi, 0.08),
+          data: new Array(24).fill(null),
+          tension: 0.4, pointRadius: 3, pointHoverRadius: 6,
+          borderWidth: 2.5, yAxisID: "y2", fill: false, spanGaps: false,
+        },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      animation: { duration: 400, easing: "easeOutQuart" },
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: {
+          display: true,
+          labels: { color: TICK, font: { family: FONT, size: 12 }, boxWidth: 20, padding: 16 },
+        },
+        tooltip: {
+          backgroundColor: "rgba(6,16,30,0.93)",
+          titleColor: TICK, bodyColor: "#fff",
+          titleFont: { family: FONT, size: 12 }, bodyFont: { family: FONT, size: 13 }, padding: 12,
+          callbacks: {
+            label: ctx => ctx.parsed.y === null ? null : `${ctx.dataset.label}: ${ctx.parsed.y}`,
+          },
+        },
+      },
+      scales: {
+        x: { ticks: { color: TICK, font: { family: FONT, size: 10 }, maxTicksLimit: 24 }, grid: { color: GRID } },
+        y: {
+          type: "linear", position: "left",
+          ticks: { color: COLORS.temp, font: { family: FONT, size: 10 } }, grid: { color: GRID },
+          title: { display: true, text: "Temp (°C)", color: COLORS.temp, font: { family: FONT, size: 10 } },
+        },
+        y1: {
+          type: "linear", position: "right",
+          ticks: { color: COLORS.hum, font: { family: FONT, size: 10 } }, grid: { drawOnChartArea: false },
+          title: { display: true, text: "Humidity (%)", color: COLORS.hum, font: { family: FONT, size: 10 } },
+        },
+        y2: {
+          type: "linear", position: "right",
+          ticks: { color: COLORS.aqi, font: { family: FONT, size: 10 } }, grid: { drawOnChartArea: false },
+          title: { display: true, text: "AQI", color: COLORS.aqi, font: { family: FONT, size: 10 } },
+        },
+      },
+    },
+  });
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  dbTempChart = buildLineChart("dbTempChart", "Temperature (°C)", COLORS.temp, -10, 60, 5);
+  dbHumChart = buildLineChart("dbHumChart", "Humidity (%)", COLORS.hum, 0, 100, 5);
+  dbAqiChart = buildLineChart("dbAqiChart", "Air Quality", COLORS.aqi, 0, 500, 50);
+  db24hrChart = build24hrChart("db24hrChart");
+});
 
 /* ================================================================
-   FETCH ALL RECORDS — defeats server-side row limits
+   FETCH ALL RECORDS  — parallel strategy, cached
    
-   We try these strategies in order until we get data:
-   1. /api/history?limit=100000          (explicit unlimited)
-   2. /api/history?limit=100000&all=true (some frameworks)
-   3. /api/history/all                   (alternate endpoint)
-   4. Paginate /api/history?page=N&per_page=100 until empty
-      → collects ALL pages automatically
-   5. /api/history (plain — whatever it returns)
+   All known URL patterns fire at once via Promise.any().
+   First successful response wins. Result is cached 60 s so
+   date switching and silent auto-refresh never re-fetch.
 ================================================================ */
 async function fetchAllRecords() {
-  const timeout = (ms) => ({ signal: AbortSignal.timeout(ms) });
-
-  /* Strategy 1 & 2 — large limit param */
-  for (const url of [
-    `${API}/history?limit=100000`,
-    `${API}/history?limit=100000&all=true`,
-    `${API}/history?per_page=100000`,
-  ]) {
-    try {
-      const r = await fetch(url, timeout(10000));
-      if (!r.ok) continue;
-      const j = await r.json();
-      if (Array.isArray(j) && j.length > 15) {
-        console.log(`[ENVCORE] Got ${j.length} records from ${url}`);
-        return j;
-      }
-    } catch (_) { }
+  /* Return cached data if still fresh */
+  if (_cachedRaw && Date.now() < _cacheExpiry) {
+    console.log(`[ENVCORE] Using cached data (${_cachedRaw.length} rows)`);
+    return _cachedRaw;
   }
 
-  /* Strategy 3 — /all endpoint */
-  try {
-    const r = await fetch(`${API}/history/all`, timeout(10000));
-    if (r.ok) {
-      const j = await r.json();
-      if (Array.isArray(j) && j.length > 0) {
-        console.log(`[ENVCORE] Got ${j.length} records from /history/all`);
-        return j;
-      }
-    }
-  } catch (_) { }
+  const timeout = ms => ({ signal: AbortSignal.timeout(ms) });
 
-  /* Strategy 4 — paginate manually */
+  /* Race all strategies in parallel — first successful response wins */
+  const candidates = [
+    `${API_DB}/history?limit=100000`,
+    `${API_DB}/history?limit=100000&all=true`,
+    `${API_DB}/history?per_page=100000`,
+    `${API_DB}/history/all`,
+    `${API_DB}/history`,
+  ];
+
+  const tryUrl = async (url) => {
+    const r = await fetch(url, timeout(12000));
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const j = await r.json();
+    if (!Array.isArray(j) || j.length === 0) throw new Error("Empty response");
+    return j;
+  };
+
   try {
-    let all = [], page = 1, perPage = 100, keepGoing = true;
-    while (keepGoing) {
-      const r = await fetch(`${API}/history?page=${page}&per_page=${perPage}`, timeout(8000));
+    const raw = await Promise.any(candidates.map(tryUrl));
+    console.log(`[ENVCORE] Fetched ${raw.length} records.`);
+    _cachedRaw = raw;
+    _cacheExpiry = Date.now() + CACHE_TTL;
+    return raw;
+  } catch (_) {
+    console.warn("[ENVCORE] All parallel strategies failed, falling back to pagination.");
+  }
+
+  /* Last resort — paginate /api/history manually */
+  try {
+    let all = [], page = 1, perPage = 100;
+    while (page <= 200) {
+      const r = await fetch(`${API_DB}/history?page=${page}&per_page=${perPage}`, timeout(8000));
       if (!r.ok) break;
       const j = await r.json();
-
-      /* Handle both {data:[...]} and plain [...] responses */
       const rows = Array.isArray(j) ? j : (Array.isArray(j.data) ? j.data : []);
       if (!rows.length) break;
-
       all = all.concat(rows);
-      console.log(`[ENVCORE] Pagination page ${page}: +${rows.length} rows, total ${all.length}`);
-
-      /* Stop if we got fewer than perPage (last page) */
-      if (rows.length < perPage) keepGoing = false;
-      else page++;
-
-      /* Safety cap to avoid infinite loop */
-      if (page > 200) break;
+      if (rows.length < perPage) break;
+      page++;
     }
-    if (all.length > 0) {
-      console.log(`[ENVCORE] Pagination complete: ${all.length} total records`);
+    if (all.length) {
+      _cachedRaw = all;
+      _cacheExpiry = Date.now() + CACHE_TTL;
       return all;
-    }
-  } catch (_) { }
-
-  /* Strategy 5 — plain fallback, whatever the server returns */
-  try {
-    const r = await fetch(`${API}/history`, timeout(8000));
-    if (r.ok) {
-      const j = await r.json();
-      if (Array.isArray(j)) {
-        console.log(`[ENVCORE] Plain /history returned ${j.length} records`);
-        return j;
-      }
     }
   } catch (_) { }
 
@@ -201,10 +279,34 @@ async function fetchAllRecords() {
 }
 
 /* ================================================================
-   UPDATE CHARTS
+   UPDATE 24HR MASTER CHART (date-aware hourly bucketing)
+================================================================ */
+function update24hrChart(dateRows) {
+  if (!db24hrChart) return;
+  const tempSlots = new Array(24).fill(null);
+  const humSlots = new Array(24).fill(null);
+  const aqiSlots = new Array(24).fill(null);
+
+  dateRows.forEach(r => {
+    const hour = new Date(r.created_at).getHours();
+    const temp = parseFloat(r.temperature);
+    const hum = parseFloat(r.humidity);
+    const aqi = parseFloat(r.air_quality);
+    if (!isNaN(temp)) tempSlots[hour] = temp;
+    if (!isNaN(hum)) humSlots[hour] = hum;
+    if (!isNaN(aqi)) aqiSlots[hour] = aqi;
+  });
+
+  db24hrChart.data.datasets[0].data = tempSlots;
+  db24hrChart.data.datasets[1].data = humSlots;
+  db24hrChart.data.datasets[2].data = aqiSlots;
+  db24hrChart.update("none");
+}
+
+/* ================================================================
+   UPDATE TIME-SERIES CHARTS  (sampled for performance)
 ================================================================ */
 function updateCharts(data) {
-  /* Sample intelligently if >300 pts for chart performance */
   let pts = data;
   if (data.length > 300) {
     const step = Math.ceil(data.length / 300);
@@ -217,7 +319,7 @@ function updateCharts(data) {
 
   [[dbTempChart, temps], [dbHumChart, hums], [dbAqiChart, aqis]].forEach(([ch, vals]) => {
     if (!ch) return;
-    ch.data.labels = labels; ch.data.datasets[0].data = vals; ch.update();
+    ch.data.labels = labels; ch.data.datasets[0].data = vals; ch.update("none");
   });
 }
 
@@ -225,13 +327,16 @@ function updateCharts(data) {
    SUMMARY CARDS
 ================================================================ */
 function updateSummary(data) {
-  const blank = () => ["scTempAvg", "scTempMin", "scTempMax", "scTempCount",
+  const IDS = ["scTempAvg", "scTempMin", "scTempMax", "scTempCount",
     "scHumAvg", "scHumMin", "scHumMax", "scHumCount",
     "scAqiAvg", "scAqiMin", "scAqiMax", "scAqiCount",
-    "scHealthVal", "scHealthMin", "scHealthMax", "scTotalRecords"].forEach(id => setEl(id, "--"));
+    "scHealthVal", "scHealthMin", "scHealthMax", "scTotalRecords"];
 
-  if (!data.length) { blank(); setEl("scHealthGrade", "No data"); return; }
-
+  if (!data.length) {
+    IDS.forEach(id => setEl(id, "--"));
+    setEl("scHealthGrade", "No data");
+    return;
+  }
   const T = data.map(d => parseFloat(d.temperature));
   const H = data.map(d => parseFloat(d.humidity));
   const A = data.map(d => parseFloat(d.air_quality));
@@ -246,8 +351,10 @@ function updateSummary(data) {
   const grade = avgS >= 80 ? "EXCELLENT" : avgS >= 60 ? "GOOD" : avgS >= 40 ? "MODERATE" : "POOR";
   setEl("scHealthGrade", grade);
   const col = hColor(avgS);
-  const ve = document.getElementById("scHealthVal"), ge = document.getElementById("scHealthGrade");
-  if (ve) ve.style.color = col; if (ge) ge.style.color = col;
+  const ve = document.getElementById("scHealthVal");
+  const ge = document.getElementById("scHealthGrade");
+  if (ve) ve.style.color = col;   /* data-driven color — must stay in JS */
+  if (ge) ge.style.color = col;
 }
 
 /* ================================================================
@@ -267,7 +374,6 @@ function renderTable(data) {
 
   const total = Math.ceil(data.length / ROWS_PER_PAGE);
   currentPage = Math.max(1, Math.min(currentPage, total));
-
   const start = (currentPage - 1) * ROWS_PER_PAGE;
   const end = Math.min(start + ROWS_PER_PAGE, data.length);
   setEl("tableInfo", `Showing ${start + 1}–${end} of ${data.length} records`);
@@ -293,26 +399,32 @@ function renderTable(data) {
   const R = 5, h = Math.floor(R / 2);
   let ps = Math.max(1, currentPage - h), pe = Math.min(total, ps + R - 1);
   if (pe - ps < R - 1) ps = Math.max(1, pe - R + 1);
-  let pg = `<button class="pg-btn" onclick="goPage(${currentPage - 1})" ${currentPage <= 1 ? "disabled" : ""}>&#8592; Prev</button>`;
-  if (ps > 1) { pg += `<button class="pg-btn" onclick="goPage(1)">1</button>`; if (ps > 2) pg += `<span class="pg-info">…</span>`; }
-  for (let p = ps; p <= pe; p++) pg += `<button class="pg-btn${p === currentPage ? " active" : ""}" onclick="goPage(${p})">${p}</button>`;
-  if (pe < total) { if (pe < total - 1) pg += `<span class="pg-info">…</span>`; pg += `<button class="pg-btn" onclick="goPage(${total})">${total}</button>`; }
-  pg += `<button class="pg-btn" onclick="goPage(${currentPage + 1})" ${currentPage >= total ? "disabled" : ""}>Next &#8594;</button>`;
+  let pg = `<button class="pg-btn" id="pgPrev" ${currentPage <= 1 ? "disabled" : ""}>&#8592; Prev</button>`;
+  if (ps > 1) { pg += `<button class="pg-btn" data-page="1">1</button>`; if (ps > 2) pg += `<span class="pg-info">…</span>`; }
+  for (let p = ps; p <= pe; p++) pg += `<button class="pg-btn${p === currentPage ? " active" : ""}" data-page="${p}">${p}</button>`;
+  if (pe < total) { if (pe < total - 1) pg += `<span class="pg-info">…</span>`; pg += `<button class="pg-btn" data-page="${total}">${total}</button>`; }
+  pg += `<button class="pg-btn" id="pgNext" ${currentPage >= total ? "disabled" : ""}>Next &#8594;</button>`;
   pg += `<span class="pg-info">Page ${currentPage} of ${total}</span>`;
   pgEl.innerHTML = pg;
+
+  /* Wire pagination clicks via delegation (no inline event handlers) */
+  pgEl.querySelectorAll(".pg-btn[data-page]").forEach(btn => {
+    btn.addEventListener("click", () => goPage(parseInt(btn.dataset.page, 10)));
+  });
+  pgEl.querySelector("#pgPrev")?.addEventListener("click", () => goPage(currentPage - 1));
+  pgEl.querySelector("#pgNext")?.addEventListener("click", () => goPage(currentPage + 1));
 }
 
-window.goPage = function (p) {
+function goPage(p) {
   const t = Math.ceil(allData.length / ROWS_PER_PAGE);
   if (p < 1 || p > t) return;
-  currentPage = p; renderTable(allData);
+  currentPage = p;
+  renderTable(allData);
   document.querySelector(".table-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
-};
+}
 
 /* ================================================================
    LOAD DATE — main entry point
-   Fetches ALL records, filters to selected date client-side.
-   silent=true skips the loading spinner (used by auto-refresh).
 ================================================================ */
 async function loadDate(dateStr, silent = false) {
   selectedDate = dateStr;
@@ -320,30 +432,25 @@ async function loadDate(dateStr, silent = false) {
 
   if (!silent) {
     document.getElementById("tableContainer").innerHTML =
-      `<div class="state-box"><div class="spinner"></div>Fetching ALL records for ${fmtLong(dateStr)}…
-       <div class="state-sub">Collecting every entry from the database — please wait.</div></div>`;
+      `<div class="state-box"><div class="spinner"></div>Fetching records for ${fmtLong(dateStr)}…
+       <div class="state-sub">Collecting entries from the database — please wait.</div></div>`;
     document.getElementById("pagination").innerHTML = "";
     setEl("recordCount", "Fetching…");
   }
 
   try {
-    /* Fetch ALL records from the database */
     const all = await fetchAllRecords();
-    console.log(`[ENVCORE] Total records fetched: ${all.length}`);
-
-    /* Filter to the selected date in LOCAL timezone */
     const data = all
       .filter(d => localDate(d.created_at) === dateStr)
       .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
 
     console.log(`[ENVCORE] Records for ${dateStr}: ${data.length}`);
-
     allData = data;
     setEl("recordCount", data.length + " records");
     updateSummary(data);
+    update24hrChart(data);
     updateCharts(data);
     renderTable(data);
-
   } catch (err) {
     document.getElementById("tableContainer").innerHTML =
       `<div class="state-box"><span class="state-icon">⚠</span>Backend unreachable.
@@ -354,85 +461,122 @@ async function loadDate(dateStr, silent = false) {
 }
 
 /* ================================================================
-   AUTO-REFRESH every 30 s — silent reload so today updates live
+   AUTO-REFRESH every 30 s — silent, reuses cache
 ================================================================ */
 function startRefresh() {
   if (refreshTimer) clearInterval(refreshTimer);
-  refreshTimer = setInterval(() => loadDate(selectedDate, true), 30000);
+  refreshTimer = setInterval(() => {
+    /* Invalidate cache for today so we always get fresh data */
+    if (selectedDate === todayStr()) _cacheExpiry = 0;
+    loadDate(selectedDate, true);
+  }, 30000);
 }
 
 /* ================================================================
    CSV EXPORT
 ================================================================ */
-document.getElementById("csvBtn")?.addEventListener("click", () => {
-  if (!allData.length) { alert("No data for this date."); return; }
-  const fname = `sensor-data-${dayName(selectedDate)}-${selectedDate}.csv`;
-  let csv = "Time,Temperature (°C),Humidity (%),Air Quality,Health Score,AQI Status\n";
-  allData.forEach(d => {
-    const hs = healthScore(d.temperature, d.humidity, d.air_quality);
-    const st = d.air_quality <= 100 ? "Good" : d.air_quality <= 200 ? "Moderate" : "Poor";
-    csv += `${fmtTime(d.created_at)},${d.temperature},${d.humidity},${d.air_quality},${hs},${st}\n`;
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("csvBtn")?.addEventListener("click", () => {
+    if (!allData.length) { alert("No data for this date."); return; }
+    const fname = `sensor-data-${dayName(selectedDate)}-${selectedDate}.csv`;
+    let csv = "Time,Temperature (°C),Humidity (%),Air Quality,Health Score,AQI Status\n";
+    allData.forEach(d => {
+      const hs = healthScore(d.temperature, d.humidity, d.air_quality);
+      const st = d.air_quality <= 100 ? "Good" : d.air_quality <= 200 ? "Moderate" : "Poor";
+      csv += `${fmtTime(d.created_at)},${d.temperature},${d.humidity},${d.air_quality},${hs},${st}\n`;
+    });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    a.download = `exports/${fname}`; document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
   });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
-  a.download = `exports/${fname}`; document.body.appendChild(a); a.click();
-  document.body.removeChild(a);
-});
 
-/* ================================================================
-   DATE PICKER & QUICK BUTTONS
-================================================================ */
-const picker = document.getElementById("datePicker");
-if (picker) {
-  picker.value = todayStr();
-  picker.max = todayStr();
-  picker.addEventListener("change", () => {
-    document.querySelectorAll(".qd-btn").forEach(b => b.classList.remove("active"));
-    loadDate(picker.value); startRefresh();
+  /* ── Date Picker ── */
+  const picker = document.getElementById("datePicker");
+  if (picker) {
+    picker.value = todayStr();
+    picker.max = todayStr();
+    picker.addEventListener("change", () => {
+      document.querySelectorAll(".qd-btn").forEach(b => b.classList.remove("active"));
+      loadDate(picker.value);
+      startRefresh();
+    });
+  }
+
+  /* ── Quick Date Buttons ── */
+  document.querySelectorAll(".qd-btn").forEach(btn => {
+    btn.addEventListener("click", function () {
+      document.querySelectorAll(".qd-btn").forEach(b => b.classList.remove("active"));
+      this.classList.add("active");
+      const d = new Date();
+      d.setDate(d.getDate() - parseInt(this.dataset.offset, 10));
+      const str = `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
+      if (picker) picker.value = str;
+      loadDate(str);
+      startRefresh();
+    });
   });
-}
 
-document.querySelectorAll(".qd-btn").forEach(btn => {
-  btn.addEventListener("click", function () {
-    document.querySelectorAll(".qd-btn").forEach(b => b.classList.remove("active"));
-    this.classList.add("active");
-    const d = new Date(); d.setDate(d.getDate() - parseInt(this.dataset.offset, 10));
-    const str = `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
-    if (picker) picker.value = str;
-    loadDate(str); startRefresh();
+  /* ── Clock ── */
+  (function tick() {
+    const e = document.getElementById("clockDisplay");
+    if (e) e.textContent = new Date().toLocaleTimeString("en-GB");
+    setTimeout(tick, 1000);
+  })();
+
+  /* ── Theme Toggle ── */
+  document.getElementById("themeToggle")?.addEventListener("click", function () {
+    const dark = document.documentElement.getAttribute("data-theme") === "dark";
+    document.documentElement.setAttribute("data-theme", dark ? "light" : "dark");
+    this.classList.toggle("light-mode", dark);
   });
+
+  /* ── Particle Background ── */
+  (function bg() {
+    const cv = document.getElementById("bgCanvas"); if (!cv) return;
+    const c = cv.getContext("2d"); let W, H;
+    function resize() { W = cv.width = innerWidth; H = cv.height = innerHeight; }
+    resize(); window.addEventListener("resize", resize);
+    const DOTS = Array.from({ length: 55 }, () => ({
+      x: Math.random() * 1920, y: Math.random() * 1080,
+      vx: (Math.random() - .5) * .16, vy: (Math.random() - .5) * .16,
+      r: Math.random() * 1.3 + .35, a: Math.random() * .38 + .14,
+    }));
+    let hp = 0;
+    function hexGrid() {
+      hp += .004; const gs = 72, cols = Math.ceil(W / (gs * 1.5)) + 2, rows = Math.ceil(H / (gs * .866)) + 2;
+      c.save(); c.globalAlpha = .016 + Math.sin(hp) * .005; c.strokeStyle = "#00e5ff"; c.lineWidth = .5;
+      for (let col = -1; col < cols; col++) for (let row = -1; row < rows; row++) {
+        const cx = col * gs * 1.5, cy = row * gs * .866 + (col % 2 ? gs * .433 : 0);
+        c.beginPath();
+        for (let i = 0; i < 6; i++) { const ang = i / 6 * 6.28 - Math.PI / 6; const px = cx + Math.cos(ang) * gs * .47, py = cy + Math.sin(ang) * gs * .47; i ? c.lineTo(px, py) : c.moveTo(px, py); }
+        c.closePath(); c.stroke();
+      }
+      c.restore();
+    }
+    (function draw() {
+      c.clearRect(0, 0, W, H);
+      const light = document.documentElement.getAttribute("data-theme") === "light";
+      if (!light) hexGrid();
+      DOTS.forEach(p => {
+        p.x += p.vx; p.y += p.vy;
+        if (p.x < 0) p.x = W; if (p.x > W) p.x = 0; if (p.y < 0) p.y = H; if (p.y > H) p.y = 0;
+        c.beginPath(); c.arc(p.x, p.y, p.r, 0, 6.28);
+        c.fillStyle = light ? `rgba(0,80,180,${p.a * .2})` : `rgba(0,229,255,${p.a * .22})`; c.fill();
+      });
+      for (let i = 0; i < DOTS.length; i++) for (let j = i + 1; j < DOTS.length; j++) {
+        const dx = DOTS[i].x - DOTS[j].x, dy = DOTS[i].y - DOTS[j].y, d = Math.sqrt(dx * dx + dy * dy);
+        if (d < 125) {
+          c.beginPath(); c.moveTo(DOTS[i].x, DOTS[i].y); c.lineTo(DOTS[j].x, DOTS[j].y);
+          c.strokeStyle = light ? `rgba(0,80,180,${.045 * (1 - d / 125)})` : `rgba(0,229,255,${.045 * (1 - d / 125)})`;
+          c.lineWidth = .5; c.stroke();
+        }
+      }
+      requestAnimationFrame(draw);
+    })();
+  })();
+
+  /* ── Initial load ── */
+  loadDate(todayStr());
+  startRefresh();
 });
-
-/* ================================================================
-   CLOCK
-================================================================ */
-(function tick() { const e = document.getElementById("clockDisplay"); if (e) e.textContent = new Date().toLocaleTimeString("en-GB"); setTimeout(tick, 1000); })();
-
-/* ================================================================
-   THEME
-================================================================ */
-document.getElementById("themeToggle")?.addEventListener("click", function () {
-  const dark = document.documentElement.getAttribute("data-theme") === "dark";
-  document.documentElement.setAttribute("data-theme", dark ? "light" : "dark");
-  this.classList.toggle("light-mode", dark);
-});
-
-/* ================================================================
-   PARTICLE BACKGROUND
-================================================================ */
-(function bg() {
-  const cv = document.getElementById("bgCanvas"); if (!cv) return;
-  const c = cv.getContext("2d"); let W, H;
-  function resize() { W = cv.width = innerWidth; H = cv.height = innerHeight; }
-  resize(); window.addEventListener("resize", resize);
-  const DOTS = Array.from({ length: 55 }, () => ({ x: Math.random() * 1920, y: Math.random() * 1080, vx: (Math.random() - .5) * .16, vy: (Math.random() - .5) * .16, r: Math.random() * 1.3 + .35, a: Math.random() * .38 + .14 }));
-  let hp = 0;
-  function hexGrid() { hp += .004; const gs = 72, cols = Math.ceil(W / (gs * 1.5)) + 2, rows = Math.ceil(H / (gs * .866)) + 2; c.save(); c.globalAlpha = .016 + Math.sin(hp) * .005; c.strokeStyle = "#00e5ff"; c.lineWidth = .5; for (let col = -1; col < cols; col++)for (let row = -1; row < rows; row++) { const cx = col * gs * 1.5, cy = row * gs * .866 + (col % 2 ? gs * .433 : 0); c.beginPath(); for (let i = 0; i < 6; i++) { const ang = i / 6 * 6.28 - Math.PI / 6; const px = cx + Math.cos(ang) * gs * .47, py = cy + Math.sin(ang) * gs * .47; i ? c.lineTo(px, py) : c.moveTo(px, py); } c.closePath(); c.stroke(); } c.restore(); }
-  (function draw() { c.clearRect(0, 0, W, H); const light = document.documentElement.getAttribute("data-theme") === "light"; if (!light) hexGrid(); DOTS.forEach(p => { p.x += p.vx; p.y += p.vy; if (p.x < 0) p.x = W; if (p.x > W) p.x = 0; if (p.y < 0) p.y = H; if (p.y > H) p.y = 0; c.beginPath(); c.arc(p.x, p.y, p.r, 0, 6.28); c.fillStyle = light ? `rgba(0,80,180,${p.a * .2})` : `rgba(0,229,255,${p.a * .22})`; c.fill(); }); for (let i = 0; i < DOTS.length; i++)for (let j = i + 1; j < DOTS.length; j++) { const dx = DOTS[i].x - DOTS[j].x, dy = DOTS[i].y - DOTS[j].y, d = Math.sqrt(dx * dx + dy * dy); if (d < 125) { c.beginPath(); c.moveTo(DOTS[i].x, DOTS[i].y); c.lineTo(DOTS[j].x, DOTS[j].y); c.strokeStyle = light ? `rgba(0,80,180,${.045 * (1 - d / 125)})` : `rgba(0,229,255,${.045 * (1 - d / 125)})`; c.lineWidth = .5; c.stroke(); } } requestAnimationFrame(draw); })();
-})();
-
-/* ================================================================
-   BOOT
-================================================================ */
-loadDate(todayStr());
-startRefresh();

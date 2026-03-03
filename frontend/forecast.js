@@ -325,8 +325,7 @@
     window.openMasterModal = function () {
         const el = document.getElementById("masterModal");
         if (!el) return;
-        el.style.display = "flex";
-        /* Re-sync large chart after resize */
+        el.classList.add("is-open");   /* CSS class-driven, no inline style */
         setTimeout(() => {
             if (masterLargeChart) {
                 masterLargeChart.data.labels = masterChart?.data.labels ?? [];
