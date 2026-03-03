@@ -1,11 +1,12 @@
 /* ================================================================
-   forecast.js — 24-Hour Forecast Layer
-   Fetches 24-hour localized forecast from Open-Meteo APIs:
-     • Weather API  → temperature, humidity
-     • Air Quality API → US AQI
-   Renders:
-     • Master Graph (full day 00:00–23:59): Temp + Humidity + AQI
-     • 3 individual 24-h tiles: Temp, Humidity, AQI
+   forecast.js — Master + Forecast Charts powered by Supabase DB
+   ─ NO Open-Meteo, NO dummy values.
+   ─ ALL data comes from the backend API (same as script.js).
+   ─ If backend is offline or no data → charts stay empty.
+   ─ Sources:
+       • Today's Master Graph → `window.ENVDATA` history bus
+       • 24-h forecast tiles  → last 24h sliced from full history
+   ─ Re-renders every 10 s to stay in sync.
 ================================================================ */
 
 (function () {
@@ -25,44 +26,65 @@
         return c.replace("rgb(", "rgba(").replace(")", `,${a})`);
     }
 
-    function ctx(id) { const e = document.getElementById(id); return e ? e.getContext("2d") : null; }
+    function ctx(id) {
+        const e = document.getElementById(id);
+        return e ? e.getContext("2d") : null;
+    }
 
-    let charts = { temp: null, hum: null, aqi: null, master: null };
+    /* ── Small stat labels shown in tile-actions ── */
+    function setEl(id, v) { const e = document.getElementById(id); if (e) e.textContent = v; }
 
-    /* ── Single-metric line chart ── */
-    function makeForecastChart(canvasId, label, color) {
+    /* ── Single-metric tile chart with fixed 24-slot time axis ── */
+    function makeTileChart(canvasId, label, color) {
         const c = ctx(canvasId);
         if (!c) return null;
+
+        /* Fixed 24-hour labels: "12 AM", "1 AM" … "11 PM" */
+        const HOURS_24 = Array.from({ length: 24 }, (_, h) => {
+            const ampm = h < 12 ? "AM" : "PM";
+            const disp = h === 0 ? 12 : h > 12 ? h - 12 : h;
+            return `${disp} ${ampm}`;
+        });
+
         return new Chart(c, {
             type: "line",
             data: {
-                labels: [], datasets: [{
+                labels: HOURS_24,
+                datasets: [{
                     label, borderColor: color,
-                    backgroundColor: rgba(color, 0.12), data: [], tension: 0.4,
-                    pointRadius: 1.5, pointHoverRadius: 6, pointBackgroundColor: color,
-                    fill: true, borderWidth: 2
+                    backgroundColor: rgba(color, 0.10),
+                    data: new Array(24).fill(null),   /* all null by default */
+                    tension: 0.4,
+                    pointRadius: 3, pointHoverRadius: 6,
+                    pointBackgroundColor: color,
+                    fill: false,         /* no fill into null regions */
+                    borderWidth: 2,
+                    spanGaps: false      /* break line at null = no data */
                 }]
             },
             options: {
                 responsive: true, maintainAspectRatio: false,
-                animation: { duration: 800, easing: "easeOutQuart" },
+                animation: false,
                 plugins: {
                     legend: { display: false },
                     tooltip: {
                         mode: "index", intersect: false, backgroundColor: "rgba(6,16,30,0.93)",
                         borderColor: color, borderWidth: 1, titleColor: TICK, bodyColor: "#fff",
-                        titleFont: { family: FONT, size: 12 }, bodyFont: { family: FONT, size: 13 }, padding: 12
-                    },
+                        titleFont: { family: FONT, size: 12 }, bodyFont: { family: FONT, size: 13 }, padding: 12,
+                        callbacks: {
+                            label: ctx => ctx.parsed.y === null ? null : `${label}: ${ctx.parsed.y}`
+                        }
+                    }
                 },
                 scales: {
                     x: { ticks: { color: TICK, maxTicksLimit: 12, maxRotation: 45, font: { family: FONT, size: 10 } }, grid: { color: GRID } },
-                    y: { ticks: { color: TICK, maxTicksLimit: 6, font: { family: FONT, size: 10 } }, grid: { color: GRID } },
-                },
-            },
+                    y: { ticks: { color: color, maxTicksLimit: 6, font: { family: FONT, size: 10 } }, grid: { color: GRID } }
+                }
+            }
         });
     }
 
-    /* ── Master 3-dataset chart (Temp | Humidity | AQI) ── */
+    /* ── 3-dataset master chart (Temp | Humidity | AQI, dual axis) ── */
     function makeMasterChart(canvasId) {
         const c = ctx(canvasId);
         if (!c) return null;
@@ -74,31 +96,37 @@
                     {
                         label: "Temperature (°C)", borderColor: COLORS.temp,
                         backgroundColor: rgba(COLORS.temp, 0.08),
-                        data: [], tension: 0.4, pointRadius: 1, borderWidth: 2, yAxisID: "y"
+                        data: [], tension: 0.4, pointRadius: 0, pointHoverRadius: 5,
+                        borderWidth: 2.5, yAxisID: "y", fill: true
                     },
                     {
                         label: "Humidity (%)", borderColor: COLORS.hum,
                         backgroundColor: rgba(COLORS.hum, 0.08),
-                        data: [], tension: 0.4, pointRadius: 1, borderWidth: 2, yAxisID: "y1"
+                        data: [], tension: 0.4, pointRadius: 0, pointHoverRadius: 5,
+                        borderWidth: 2.5, yAxisID: "y1", fill: true
                     },
                     {
                         label: "Air Quality Index", borderColor: COLORS.aqi,
                         backgroundColor: rgba(COLORS.aqi, 0.08),
-                        data: [], tension: 0.4, pointRadius: 1, borderWidth: 2, yAxisID: "y2"
+                        data: [], tension: 0.4, pointRadius: 0, pointHoverRadius: 5,
+                        borderWidth: 2.5, yAxisID: "y2", fill: true
                     }
                 ]
             },
             options: {
                 responsive: true, maintainAspectRatio: false,
-                animation: { duration: 800, easing: "easeOutQuart" },
+                animation: false,
                 interaction: { mode: "index", intersect: false },
                 plugins: {
-                    legend: { display: true, labels: { color: TICK, font: { family: FONT, size: 12 }, boxWidth: 20 } },
+                    legend: {
+                        display: true,
+                        labels: { color: TICK, font: { family: FONT, size: 12 }, boxWidth: 20, padding: 16 }
+                    },
                     tooltip: {
                         backgroundColor: "rgba(6,16,30,0.93)",
                         titleColor: TICK, bodyColor: "#fff",
                         titleFont: { family: FONT, size: 12 }, bodyFont: { family: FONT, size: 13 }, padding: 12
-                    },
+                    }
                 },
                 scales: {
                     x: {
@@ -123,102 +151,205 @@
                         grid: { drawOnChartArea: false },
                         title: { display: true, text: "AQI", color: COLORS.aqi, font: { family: FONT, size: 10 } }
                     }
-                },
-            },
+                }
+            }
         });
     }
 
+    /* ── Chart instances ── */
+    let masterChart = null;
+    let masterLargeChart = null;
+    let tempTileChart = null;
+    let humTileChart = null;
+    let aqiTileChart = null;
+
     function initCharts() {
-        charts.temp = makeForecastChart("foreTempChart", "Temperature (°C)", COLORS.temp);
-        charts.hum = makeForecastChart("foreHumChart", "Humidity (%)", COLORS.hum);
-        charts.aqi = makeForecastChart("foreAqiChart", "Air Quality Index (US AQI)", COLORS.aqi);
-        charts.master = makeMasterChart("masterForeChart");
+        masterChart = makeMasterChart("masterForeChart");
+        masterLargeChart = makeMasterChart("masterLargeCanvas");
+        tempTileChart = makeTileChart("foreTempChart", "Temperature (°C)", COLORS.temp);
+        humTileChart = makeTileChart("foreHumChart", "Humidity (%)", COLORS.hum);
+        aqiTileChart = makeTileChart("foreAqiChart", "Air Quality Index", COLORS.aqi);
     }
 
-    /* ── Format "2026-03-03T14:00" → "2 PM" ── */
-    function formatTime(t) {
-        const d = new Date(t);
-        let h = d.getHours();
-        const ampm = h >= 12 ? "PM" : "AM";
-        h = h % 12 || 12;
-        return `${h} ${ampm}`;
+    /* ── Clear all charts (no data) ── */
+    function clearAll() {
+        /* Master charts: wipe labels + data */
+        [masterChart, masterLargeChart].forEach(ch => {
+            if (!ch) return;
+            ch.data.labels = [];
+            ch.data.datasets.forEach(ds => (ds.data = []));
+            ch.update("none");
+        });
+        /* Tile charts: reset to 24 nulls (keeps time axis, line goes flat/empty) */
+        [tempTileChart, humTileChart, aqiTileChart].forEach(ch => {
+            if (!ch) return;
+            ch.data.datasets[0].data = new Array(24).fill(null);
+            ch.update("none");
+        });
     }
 
-    /* ── Build local YYYY-MM-DD for current day ── */
-    function localYMD(date) {
-        return date.getFullYear() + "-"
-            + String(date.getMonth() + 1).padStart(2, "0") + "-"
-            + String(date.getDate()).padStart(2, "0");
+    /* ── Update a single-metric 24-h tile chart ── */
+    /* data24 = array of 24 values (or null), indexed by hour 0–23 */
+    function updateTile(chart, data24) {
+        if (!chart) return;
+        chart.data.datasets[0].data = data24;
+        chart.update("none");
     }
 
-    async function fetchForecast() {
-        const lat = localStorage.getItem("user_lat") || "20.3533";
-        const lon = localStorage.getItem("user_lon") || "85.8266";
+    /* ── Update master chart (both small and large canvases) ── */
+    function updateMasterBoth(labels, temps, hums, aqis) {
+        [masterChart, masterLargeChart].forEach(ch => {
+            if (!ch) return;
+            ch.data.labels = labels;
+            ch.data.datasets[0].data = temps;
+            ch.data.datasets[1].data = hums;
+            ch.data.datasets[2].data = aqis;
+            ch.update("none");
+        });
+    }
 
-        try {
-            /* Fetch weather + AQI in parallel */
-            const [wxRes, aqRes] = await Promise.all([
-                fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,relative_humidity_2m&timezone=auto&forecast_days=2`),
-                fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&hourly=us_aqi&timezone=auto&forecast_days=2`)
-            ]);
+    /* ── Sync from window.ENVDATA ── */
+    function sync() {
+        const D = window.ENVDATA;
 
-            if (!wxRes.ok || !aqRes.ok) return;
-            const wx = await wxRes.json();
-            const aq = await aqRes.json();
-
-            if (!wx?.hourly || !aq?.hourly) return;
-
-            const now = new Date();
-            const todayStr = localYMD(now);
-
-            /* ── Find index of current hour in weather data ── */
-            let startIdx = 0;
-            for (let i = 0; i < wx.hourly.time.length; i++) {
-                if (new Date(wx.hourly.time[i]) >= now) { startIdx = i; break; }
-            }
-
-            /* ── Next-24h slices ── */
-            const times24 = wx.hourly.time.slice(startIdx, startIdx + 24);
-            const temps24 = wx.hourly.temperature_2m.slice(startIdx, startIdx + 24);
-            const hums24 = wx.hourly.relative_humidity_2m.slice(startIdx, startIdx + 24);
-
-            /* AQI times may differ in length — align by matching timestamps */
-            const aqMap = {};
-            aq.hourly.time.forEach((t, i) => { aqMap[t] = aq.hourly.us_aqi[i]; });
-            const aqis24 = times24.map(t => aqMap[t] ?? null);
-
-            const labels24 = times24.map(formatTime);
-
-            /* Individual tiles */
-            if (charts.temp) { charts.temp.data.labels = labels24; charts.temp.data.datasets[0].data = temps24; charts.temp.update(); }
-            if (charts.hum) { charts.hum.data.labels = labels24; charts.hum.data.datasets[0].data = hums24; charts.hum.update(); }
-            if (charts.aqi) { charts.aqi.data.labels = labels24; charts.aqi.data.datasets[0].data = aqis24; charts.aqi.update(); }
-
-            /* ── Master graph: today 00:00–23:59 ── */
-            let todayStartIdx = 0;
-            for (let i = 0; i < wx.hourly.time.length; i++) {
-                if (wx.hourly.time[i].substring(0, 10) === todayStr) { todayStartIdx = i; break; }
-            }
-            const masterTimes = wx.hourly.time.slice(todayStartIdx, todayStartIdx + 24);
-            const masterLabels = masterTimes.map(formatTime);
-            const masterTemps = wx.hourly.temperature_2m.slice(todayStartIdx, todayStartIdx + 24);
-            const masterHums = wx.hourly.relative_humidity_2m.slice(todayStartIdx, todayStartIdx + 24);
-            const masterAqis = masterTimes.map(t => aqMap[t] ?? null);
-
-            if (charts.master) {
-                charts.master.data.labels = masterLabels;
-                charts.master.data.datasets[0].data = masterTemps;
-                charts.master.data.datasets[1].data = masterHums;
-                charts.master.data.datasets[2].data = masterAqis;
-                charts.master.update();
-            }
-
-        } catch (err) {
-            console.error("Forecast fetch error:", err);
+        /* If backend offline or no data → clear everything, show nothing */
+        if (!D || !D.backendOnline || !D.ready || !D.labels.length) {
+            clearAll();
+            return;
         }
+
+        /* Grab the full history from the shared bus */
+        const allLabels = D.labels;   /* HH:MM:SS strings */
+        const allTemps = D.temps;
+        const allHums = D.hums;
+        const allAqis = D.aqis;
+
+        /* ── Today's Master Graph: filter only today's readings ── */
+        const todayStr = (() => {
+            const n = new Date();
+            return n.getFullYear() + "-"
+                + String(n.getMonth() + 1).padStart(2, "0") + "-"
+                + String(n.getDate()).padStart(2, "0");
+        })();
+
+        /* ENVDATA.labels are "HH:MM:SS" — we need created_at or actual date.
+           Script.js window bus only carries time labels, not full ISO dates.
+           We fetch full history directly from the history endpoint instead. */
+        fetchAndRender();
     }
 
-    window.addEventListener("DOMContentLoaded", () => { initCharts(); fetchForecast(); });
-    window.addEventListener("locationUpdated", () => { fetchForecast(); });
+    /* ── Main fetch from DB ── */
+    let _lastRenderTs = "";
+    async function fetchAndRender() {
+        const D = window.ENVDATA;
+        if (!D || !D.backendOnline) { clearAll(); return; }
+
+        const API_URL = window._ENVCORE_API_URL || "https://dbms-mini-project-vgp4.onrender.com/api";
+        const endpoints = [
+            `${API_URL}/history?limit=10000`,
+            `${API_URL}/history?all=true`,
+            `${API_URL}/history`
+        ];
+
+        let raw = null;
+        for (const url of endpoints) {
+            try {
+                const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+                if (!res.ok) continue;
+                const arr = await res.json();
+                if (!Array.isArray(arr) || !arr.length) continue;
+                raw = arr;
+                break;
+            } catch (_) { continue; }
+        }
+
+        /* No data from DB → clear charts, show nothing */
+        if (!raw) { clearAll(); return; }
+
+        /* Sort by time ascending */
+        raw.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+        const lastTs = raw[raw.length - 1]?.created_at || "";
+        if (lastTs === _lastRenderTs) return;   /* nothing new */
+        _lastRenderTs = lastTs;
+
+        const now = new Date();
+        const todayStr = now.getFullYear() + "-"
+            + String(now.getMonth() + 1).padStart(2, "0") + "-"
+            + String(now.getDate()).padStart(2, "0");
+
+        /* ── Today's full-day data for master graph ── */
+        const todayRows = raw.filter(r => r.created_at && r.created_at.substring(0, 10) === todayStr);
+
+        if (todayRows.length) {
+            const masterLabels = todayRows.map(r => {
+                const d = new Date(r.created_at);
+                return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+            });
+            updateMasterBoth(
+                masterLabels,
+                todayRows.map(r => parseFloat(r.temperature)),
+                todayRows.map(r => parseFloat(r.humidity)),
+                todayRows.map(r => parseFloat(r.air_quality))
+            );
+        } else {
+            /* No today's data yet */
+            [masterChart, masterLargeChart].forEach(ch => {
+                if (!ch) return;
+                ch.data.labels = [];
+                ch.data.datasets.forEach(ds => (ds.data = []));
+                ch.update("none");
+            });
+        }
+
+        /* ── 24-hour tile charts: fixed 24-slot time axis, null where no data ── */
+        /* Build hour-buckets for ALL 24 hours of today */
+        /* We use the LAST reading per hour slot (most recent sensor value that hour) */
+        const tempSlots = new Array(24).fill(null);
+        const humSlots = new Array(24).fill(null);
+        const aqiSlots = new Array(24).fill(null);
+
+        /* Use today's DB rows to populate slots */
+        todayRows.forEach(r => {
+            const hour = new Date(r.created_at).getHours(); /* 0–23 */
+            const temp = parseFloat(r.temperature);
+            const hum = parseFloat(r.humidity);
+            const aqi = parseFloat(r.air_quality);
+            if (!isNaN(temp)) tempSlots[hour] = temp;
+            if (!isNaN(hum)) humSlots[hour] = hum;
+            if (!isNaN(aqi)) aqiSlots[hour] = aqi;
+        });
+
+        updateTile(tempTileChart, tempSlots);
+        updateTile(humTileChart, humSlots);
+        updateTile(aqiTileChart, aqiSlots);
+    }
+
+    /* ── Fullscreen handler for master ── */
+    window.openMasterModal = function () {
+        const el = document.getElementById("masterModal");
+        if (!el) return;
+        el.style.display = "flex";
+        /* Re-sync large chart after resize */
+        setTimeout(() => {
+            if (masterLargeChart) {
+                masterLargeChart.data.labels = masterChart?.data.labels ?? [];
+                masterLargeChart.data.datasets.forEach((ds, i) => {
+                    ds.data = masterChart?.data.datasets[i]?.data ?? [];
+                });
+                masterLargeChart.resize();
+                masterLargeChart.update("none");
+            }
+        }, 60);
+    };
+
+    /* ── Boot ── */
+    document.addEventListener("DOMContentLoaded", () => {
+        initCharts();
+        /* Wait briefly for script.js to do its first fetch, then sync */
+        setTimeout(fetchAndRender, 1500);
+        /* Refresh every 10 s to match script.js history poll */
+        setInterval(fetchAndRender, 10000);
+    });
 
 })();

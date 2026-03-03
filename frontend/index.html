@@ -225,7 +225,10 @@
           <span class="tile-dot temp-c"></span>
           <span class="tile-dot hum-c"></span>
           <span class="tile-dot" style="background:#00ff88;box-shadow:0 0 6px #00ff88;"></span>
-          <h3>Full Day Local Environmental Master Graph</h3>
+          <h3>Full Day Sensor Master Graph — From DB</h3>
+        </div>
+        <div class="tile-actions">
+          <button class="fullscreen-btn" onclick="openMasterModal()" title="Fullscreen">&#10559;</button>
         </div>
       </div>
       <div class="tile-chart-wrap" style="height: 280px;"><canvas id="masterForeChart"></canvas></div>
@@ -351,6 +354,16 @@
     </div>
   </div>
 
+  <div id="masterModal" class="modal" onclick="if(event.target===this)closeModal('masterModal')">
+    <div class="modal-content" style="max-width:1100px;">
+      <div class="modal-head">
+        <h3 class="modal-title">Full Day Sensor Master Graph &mdash; Full View</h3>
+        <span class="close" onclick="closeModal('masterModal')">&#10005;</span>
+      </div>
+      <div class="modal-chart-wrap" style="height:500px;"><canvas id="masterLargeCanvas"></canvas></div>
+    </div>
+  </div>
+
   <div id="locationModal" class="modal" onclick="if(event.target===this)closeModal('locationModal')">
     <div class="modal-content location-modal-content">
       <div class="modal-head location-modal-head">
@@ -377,6 +390,8 @@
 
 
 
+  <!-- Expose API URL globally for forecast.js -->
+  <script>window._ENVCORE_API_URL = "https://dbms-mini-project-vgp4.onrender.com/api";</script>
   <script src="location.js"></script>
   <script src="script.js"></script>
   <script src="charts.js"></script>
