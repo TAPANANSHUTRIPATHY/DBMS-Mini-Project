@@ -4,11 +4,14 @@
    • fetchHistory() every 10 seconds → syncs sliding window from DB
    • Backend offline = all values show "--", charts clear
    • Exposes window.ENVDATA for charts.js
-   • MAX_PTS = 120 → 2 minutes of 1-second data visible at once
+   • MAX_PTS = 40 → last 40 readings of 1s interval visible at once
 ================================================================ */
 
 const API_URL = "https://dbms-mini-project-vgp4.onrender.com/api";
-const MAX_PTS = 40;   /* Show last 20 readings of 1s interval */
+const MAX_PTS = 40;
+
+/* Expose API URL for forecast.js (formerly an inline script tag in HTML) */
+window._ENVCORE_API_URL = API_URL;
 
 /* ── Shared data bus ── */
 window.ENVDATA = {
@@ -17,44 +20,34 @@ window.ENVDATA = {
 };
 
 /* ── DOM refs ── */
-const tempEl         = document.getElementById("temp");
-const humEl          = document.getElementById("hum");
-const airEl          = document.getElementById("air");
-const airStatusEl    = document.getElementById("airStatus");
-const airCard        = document.getElementById("airCard");
+const tempEl = document.getElementById("temp");
+const humEl = document.getElementById("hum");
+const airEl = document.getElementById("air");
+const airStatusEl = document.getElementById("airStatus");
+const airCard = document.getElementById("airCard");
 const tempGaugeValue = document.getElementById("tempGaugeValue");
-const airGaugeValue  = document.getElementById("airGaugeValue");
+const airGaugeValue = document.getElementById("airGaugeValue");
 
 /* ── AQI status ── */
 function getAirStatus(v) {
-  if (v <= 50) {
-    return { text: "🟢 Good", color: "#00ff88" };
-  }
-  if (v <= 100) {
-    return { text: "🟡 Moderate", color: "#ffcc00" };
-  }
-  if (v <= 150) {
-    return { text: "🟠 Unhealthy for Sensitive", color: "#ff9900" };
-  }
-  if (v <= 200) {
-    return { text: "🔴 Unhealthy", color: "#ff4d4d" };
-  }
-  if (v <= 300) {
-    return { text: "🟣 Very Unhealthy", color: "#cc0099" };
-  }
+  if (v <= 50) return { text: "🟢 Good", color: "#00ff88" };
+  if (v <= 100) return { text: "🟡 Moderate", color: "#ffcc00" };
+  if (v <= 150) return { text: "🟠 Unhealthy for Sensitive", color: "#ff9900" };
+  if (v <= 200) return { text: "🔴 Unhealthy", color: "#ff4d4d" };
+  if (v <= 300) return { text: "🟣 Very Unhealthy", color: "#cc0099" };
   return { text: "🟤 Hazardous", color: "#800000" };
 }
 
 /* ── Show "--" on all cards when offline ── */
 function showOffline() {
   if (tempEl) tempEl.textContent = "-- °C";
-  if (humEl)  humEl.textContent  = "-- %";
-  if (airEl)  airEl.textContent  = "--";
+  if (humEl) humEl.textContent = "-- %";
+  if (airEl) airEl.textContent = "--";
   if (airStatusEl) airStatusEl.textContent = "--";
   if (tempGaugeValue) tempGaugeValue.textContent = "--";
-  if (airGaugeValue)  airGaugeValue.textContent  = "--";
+  if (airGaugeValue) airGaugeValue.textContent = "--";
   window.ENVDATA.backendOnline = false;
-  window.ENVDATA.ready         = false;
+  window.ENVDATA.ready = false;
 }
 
 /* ================================================================
@@ -65,9 +58,7 @@ const TICK = "rgba(200,232,255,0.72)";
 const GRID = "rgba(255,255,255,0.06)";
 
 let tempChart = null;
-let airChart  = null;
-let tempGauge = null;
-let airGauge  = null;
+let airChart = null;
 
 function makeLineChart(id, label, color, yMin, yMax, yStep) {
   const el = document.getElementById(id);
@@ -75,61 +66,55 @@ function makeLineChart(id, label, color, yMin, yMax, yStep) {
   const fill = color.replace("rgb(", "rgba(").replace(")", ",0.13)");
   return new Chart(el.getContext("2d"), {
     type: "line",
-    data: { labels: [], datasets: [{ label, borderColor: color, backgroundColor: fill,
-      data: [], tension: 0.4, pointRadius: 1.5, pointHoverRadius: 6,
-      pointBackgroundColor: color, fill: true, borderWidth: 2 }] },
+    data: {
+      labels: [], datasets: [{
+        label, borderColor: color, backgroundColor: fill,
+        data: [], tension: 0.4, pointRadius: 1.5, pointHoverRadius: 6,
+        pointBackgroundColor: color, fill: true, borderWidth: 2
+      }]
+    },
     options: {
       responsive: true, maintainAspectRatio: false,
-      /* NO animation on the main chart so scrolling feels instant */
-      animation: false,
+      animation: false,   /* skip animation on live chart for instant scroll */
       plugins: {
         legend: { labels: { color: TICK, font: { family: FONT, size: 13 }, boxWidth: 26, padding: 12 } },
-        tooltip: { mode: "index", intersect: false, backgroundColor: "rgba(6,16,30,0.93)",
+        tooltip: {
+          mode: "index", intersect: false, backgroundColor: "rgba(6,16,30,0.93)",
           borderColor: color, borderWidth: 1, titleColor: TICK, bodyColor: "#fff",
-          titleFont: { family: FONT, size: 12 }, bodyFont: { family: FONT, size: 13 }, padding: 12 },
+          titleFont: { family: FONT, size: 12 }, bodyFont: { family: FONT, size: 13 }, padding: 12
+        },
       },
       scales: {
         x: { ticks: { color: TICK, maxTicksLimit: 10, maxRotation: 45, font: { family: FONT, size: 10 } }, grid: { color: GRID } },
-        y: { min: yMin, max: yMax,
+        y: {
+          min: yMin, max: yMax,
           ticks: { color: TICK, stepSize: yStep, maxTicksLimit: 16, font: { family: FONT, size: 10 } },
-          grid: { color: GRID } },
+          grid: { color: GRID }
+        },
       },
     },
   });
 }
 
-tempChart = makeLineChart("tempHumChart", "Temperature (°C)", "rgb(255,77,77)",  -10,  60,   5);
-airChart  = makeLineChart("airChart",     "Air Quality",      "rgb(0,255,136)",    0, 500, 50);
+tempChart = makeLineChart("tempHumChart", "Temperature (°C)", "rgb(255,77,77)", -10, 60, 5);
+airChart = makeLineChart("airChart", "Air Quality", "rgb(0,255,136)", 0, 500, 50);
 
 /* ================================================================
    APPEND ONE POINT to the live sliding window
-   Called every second from fetchLatest
 ================================================================ */
 function appendPoint(label, temp, hum, aqi) {
   const D = window.ENVDATA;
-
-  /* Avoid duplicate timestamps */
   if (D.labels.length > 0 && D.labels[D.labels.length - 1] === label) return false;
-
-  D.labels.push(label);
-  D.temps.push(temp);
-  D.hums.push(hum);
-  D.aqis.push(aqi);
-
-  /* Slide window */
-  if (D.labels.length > MAX_PTS) {
-    D.labels.shift(); D.temps.shift(); D.hums.shift(); D.aqis.shift();
-  }
-  D.ready         = true;
-  D.backendOnline = true;
-  return true; /* new point added */
+  D.labels.push(label); D.temps.push(temp); D.hums.push(hum); D.aqis.push(aqi);
+  if (D.labels.length > MAX_PTS) { D.labels.shift(); D.temps.shift(); D.hums.shift(); D.aqis.shift(); }
+  D.ready = true; D.backendOnline = true;
+  return true;
 }
 
 /* ================================================================
    fetchLatest — every 1 second
-   Updates cards, gauges, and appends one live point to charts
 ================================================================ */
-let _latestTs = "";  /* track last seen timestamp to avoid duplicates */
+let _latestTs = "";
 
 async function fetchLatest() {
   try {
@@ -139,66 +124,53 @@ async function fetchLatest() {
     if (!d) { showOffline(); return; }
 
     const temp = parseFloat(d.temperature);
-    const hum  = parseFloat(d.humidity);
-    const aqi  = parseFloat(d.air_quality);
+    const hum = parseFloat(d.humidity);
+    const aqi = parseFloat(d.air_quality);
     if (isNaN(temp) || isNaN(hum) || isNaN(aqi)) { showOffline(); return; }
 
-    /* Update DOM cards */
     if (tempEl) tempEl.textContent = temp.toFixed(1) + " °C";
-    if (humEl)  humEl.textContent  = hum.toFixed(1)  + " %";
-    if (airEl)  airEl.textContent  = aqi;
+    if (humEl) humEl.textContent = hum.toFixed(1) + " %";
+    if (airEl) airEl.textContent = aqi;
 
     const status = getAirStatus(aqi);
     if (airStatusEl) airStatusEl.textContent = status.text;
-    if (airCard)     airCard.style.boxShadow = `0 0 30px ${status.color}`;
+    if (airCard) airCard.style.boxShadow = `0 0 30px ${status.color}`;  /* data-driven, must stay in JS */
 
-    /* Gauges */
     if (tempGaugeValue) tempGaugeValue.textContent = temp.toFixed(1) + " °C";
-
     if (airGaugeValue) airGaugeValue.textContent = aqi;
 
-    window.ENVDATA.latest        = d;
+    window.ENVDATA.latest = d;
     window.ENVDATA.backendOnline = true;
 
-    /* Append to live sliding window */
-    const ts    = d.created_at || new Date().toISOString();
+    const ts = d.created_at || new Date().toISOString();
     const label = new Date(ts).toLocaleTimeString("en-GB");
-    const added = appendPoint(label, temp, hum, aqi);
+    appendPoint(label, temp, hum, aqi);
 
-    /* Push to charts on every call (even if same point — still update for gauge animations) */
     const D = window.ENVDATA;
     if (tempChart && D.labels.length > 0) {
-      tempChart.data.labels           = D.labels;
+      tempChart.data.labels = D.labels;
       tempChart.data.datasets[0].data = D.temps;
-      tempChart.update("none");  /* "none" = skip animation → instant scroll */
+      tempChart.update("none");
     }
     if (airChart && D.labels.length > 0) {
-      airChart.data.labels           = D.labels;
+      airChart.data.labels = D.labels;
       airChart.data.datasets[0].data = D.aqis;
       airChart.update("none");
     }
-
-  } catch (_) {
-    showOffline();
-  }
+  } catch (_) { showOffline(); }
 }
 
 /* ================================================================
    fetchHistory — every 10 seconds
-   Syncs the full sliding window from DB history so the chart
-   starts populated and stays in sync after any gap.
-   Tries multiple URL patterns to handle different backends.
 ================================================================ */
 let _historyLastTs = "";
 
 async function fetchHistory() {
-  /* Try multiple endpoint patterns in order */
   const endpoints = [
     `${API_URL}/history?limit=10000`,
     `${API_URL}/history?all=true`,
     `${API_URL}/history`,
   ];
-
   for (const url of endpoints) {
     try {
       const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
@@ -206,48 +178,109 @@ async function fetchHistory() {
       const raw = await res.json();
       if (!Array.isArray(raw) || !raw.length) continue;
 
-      /* Got data — use it */
-      const slice  = raw.slice(-MAX_PTS);
+      const slice = raw.slice(-MAX_PTS);
       const lastTs = slice[slice.length - 1]?.created_at || "";
-
-      /* Only redraw if something changed */
       if (lastTs === _historyLastTs) break;
       _historyLastTs = lastTs;
 
       const labels = slice.map(d => new Date(d.created_at).toLocaleTimeString("en-GB"));
-      const temps  = slice.map(d => parseFloat(d.temperature));
-      const hums   = slice.map(d => parseFloat(d.humidity));
-      const aqis   = slice.map(d => parseFloat(d.air_quality));
+      const temps = slice.map(d => parseFloat(d.temperature));
+      const hums = slice.map(d => parseFloat(d.humidity));
+      const aqis = slice.map(d => parseFloat(d.air_quality));
 
-      window.ENVDATA.labels       = labels;
-      window.ENVDATA.temps        = temps;
-      window.ENVDATA.hums         = hums;
-      window.ENVDATA.aqis         = aqis;
-      window.ENVDATA.ready        = true;
-      window.ENVDATA.backendOnline= true;
+      window.ENVDATA.labels = labels;
+      window.ENVDATA.temps = temps;
+      window.ENVDATA.hums = hums;
+      window.ENVDATA.aqis = aqis;
+      window.ENVDATA.ready = true;
+      window.ENVDATA.backendOnline = true;
 
       if (tempChart) { tempChart.data.labels = labels; tempChart.data.datasets[0].data = temps; tempChart.update("none"); }
-      if (airChart)  { airChart.data.labels  = labels; airChart.data.datasets[0].data  = aqis;  airChart.update("none"); }
-      break;  /* success, stop trying */
-
+      if (airChart) { airChart.data.labels = labels; airChart.data.datasets[0].data = aqis; airChart.update("none"); }
+      break;
     } catch (_) { continue; }
   }
 }
 
 /* ================================================================
-   Modal control
+   MODAL HELPERS
+   Use CSS class "is-open" instead of style.display manipulation.
+   Exposed on window so forecast.js / location.js can call them.
 ================================================================ */
-window.openModal  = id => { const el = document.getElementById(id); if (el) el.style.display = "flex"; };
-window.closeModal = id => { const el = document.getElementById(id); if (el) el.style.display = "none"; };
+window.openModal = function (id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.add("is-open");
+  /* Trigger chart resize after transition */
+  setTimeout(() => {
+    if (id === "tempModal") window._modalResizeFn?.("tempModal");
+    if (id === "humModal") window._modalResizeFn?.("humModal");
+    if (id === "airModal") window._modalResizeFn?.("airModal");
+  }, 60);
+};
+
+window.closeModal = function (id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.remove("is-open");
+};
 
 /* ================================================================
-   Timers:
-   • fetchLatest  every 1000ms  → live chart scrolling + card updates
-   • fetchHistory every 10000ms → sync full window from DB
+   EVENT WIRING — all handler that were formerly inline onclick=
+   (located in index.html). Script runs with defer so DOM is ready.
 ================================================================ */
-setInterval(fetchLatest,  1000);
+document.addEventListener("DOMContentLoaded", () => {
+
+  /* Alert close button */
+  document.getElementById("alertClose")?.addEventListener("click", () => {
+    document.getElementById("alertBanner")?.classList.add("hidden");
+  });
+
+  /* Location badge → open locationModal */
+  document.getElementById("locationBadge")?.addEventListener("click", () => {
+    window.openModal("locationModal");
+  });
+
+  /* Fullscreen buttons */
+  document.getElementById("masterFullscreenBtn")?.addEventListener("click", () => {
+    window.openMasterModal?.();
+  });
+  document.getElementById("tempFullscreenBtn")?.addEventListener("click", () => {
+    window.openModal("tempModal");
+  });
+  document.getElementById("humFullscreenBtn")?.addEventListener("click", () => {
+    window.openModal("humModal");
+  });
+  document.getElementById("airFullscreenBtn")?.addEventListener("click", () => {
+    window.openModal("airModal");
+  });
+
+  /* Modal backdrop + close buttons — delegate on all modals */
+  document.querySelectorAll(".modal").forEach(modal => {
+    /* Click on backdrop closes modal */
+    modal.addEventListener("click", e => {
+      if (e.target === modal) window.closeModal(modal.id);
+    });
+  });
+  document.querySelectorAll(".close[data-modal]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      window.closeModal(btn.dataset.modal);
+    });
+  });
+
+  /* Escape key closes any open modal */
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape") {
+      document.querySelectorAll(".modal.is-open").forEach(m => window.closeModal(m.id));
+    }
+  });
+
+});
+
+/* ================================================================
+   TIMERS
+================================================================ */
+setInterval(fetchLatest, 1000);
 setInterval(fetchHistory, 10000);
 
-/* Initial load */
-fetchHistory();   /* load history first so chart starts with data */
-setTimeout(fetchLatest, 500);  /* then start live updates */
+fetchHistory();
+setTimeout(fetchLatest, 500);

@@ -12,7 +12,7 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Rajdhani:wght@300;400;500;600&display=swap"
     rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
 </head>
 
 <body>
@@ -149,6 +149,20 @@
       </div>
     </div>
 
+    <!-- 24HR Master Graph (date-aware, hourly axis) -->
+    <div class="chart-panel">
+      <div class="panel-head">
+        <div class="panel-title">
+          <span class="panel-dot panel-dot-temp"></span>
+          <span class="panel-dot panel-dot-humidity"></span>
+          <span class="panel-dot panel-dot-aqi"></span>
+          Full Day — 24HR Master Graph
+        </div>
+        <span class="panel-unit">00:00 – 23:00</span>
+      </div>
+      <div class="panel-chart-wrap db-master-wrap"><canvas id="db24hrChart"></canvas></div>
+    </div>
+
     <!-- Charts: Temp + Humidity side by side -->
     <div class="panels-grid">
       <div class="chart-panel">
@@ -192,8 +206,8 @@
 
   </div>
 
-  <script src="location.js"></script>
-  <script src="dashboard.js"></script>
+  <script src="location.js" defer></script>
+  <script src="dashboard.js" defer></script>
 </body>
 
 </html>
