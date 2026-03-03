@@ -364,21 +364,13 @@
   setTimeout(sync, 600);
 
   /* ================================================================
-     MODALS
+     MODALS — resize charts on open; open/close owned by script.js
   ================================================================ */
-  window.openModal = function (id) {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.style.display = "flex";
-    setTimeout(() => {
-      if (id === "tempModal" && tempLargeChart) tempLargeChart.resize();
-      if (id === "humModal" && humLargeChart) humLargeChart.resize();
-      if (id === "airModal" && airLargeChart) airLargeChart.resize();
-    }, 60);
-  };
-  window.closeModal = function (id) {
-    const el = document.getElementById(id);
-    if (el) el.style.display = "none";
+  /* Register chart resize callbacks for script.js to trigger */
+  window._modalResizeFn = function (id) {
+    if (id === "tempModal" && tempLargeChart) tempLargeChart.resize();
+    if (id === "humModal" && humLargeChart) humLargeChart.resize();
+    if (id === "airModal" && airLargeChart) airLargeChart.resize();
   };
 
   /* ================================================================
