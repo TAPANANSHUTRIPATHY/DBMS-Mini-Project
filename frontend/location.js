@@ -7,12 +7,19 @@
 /* ── Debounce helper ── */
 let _searchTimer = null;
 
-function updateLocationDisplay(name) {
+function updateLocationDisplay(name, lat, lon) {
     const disp = document.getElementById("locationDisplay");
     const icon = document.getElementById("locationIcon");
     if (!disp) return;
     disp.textContent = name;
     localStorage.setItem("user_location", name);
+
+    if (lat !== undefined && lon !== undefined) {
+        localStorage.setItem("user_lat", lat);
+        localStorage.setItem("user_lon", lon);
+        window.dispatchEvent(new Event("locationUpdated"));
+    }
+
     if (icon) {
         icon.classList.remove("pinging");
         icon.classList.add("located");
@@ -51,23 +58,24 @@ function setupAutocomplete() {
 
         clearTimeout(_searchTimer);
         _searchTimer = setTimeout(() => {
-            // Open-Meteo Geocoding API
-            fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=6&language=en&format=json`)
+            // Photon API (OSM based, better for POIs in India like KIIT)
+            fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=6`)
                 .then(r => r.json())
                 .then(data => {
-                    const results = data.results;
+                    const results = data.features;
                     if (!results || !results.length) {
                         dropdown.innerHTML = `<div class="loc-dd-item loc-dd-empty">No results found</div>`;
                         dropdown.style.display = "block";
                         return;
                     }
                     dropdown.innerHTML = results.map(r => {
-                        // r.name (City/Town), r.admin1 (State), r.country
-                        const parts = [r.name, r.admin1, r.country].filter(Boolean);
-                        // Filter out duplicates (sometimes name and admin1 are the same)
+                        const p = r.properties;
+                        const parts = [p.name, p.city || p.town || p.district, p.state, p.country].filter(Boolean);
                         const uniqueParts = [...new Set(parts)];
                         const displayName = uniqueParts.join(", ");
-                        return `<div class="loc-dd-item" data-name="${displayName.replace(/"/g, '&quot;')}">${displayName}</div>`;
+                        const lon = r.geometry.coordinates[0];
+                        const lat = r.geometry.coordinates[1];
+                        return `<div class="loc-dd-item" data-name="${displayName.replace(/"/g, '&quot;')}" data-lat="${lat}" data-lon="${lon}">${displayName}</div>`;
                     }).join("");
                     dropdown.style.display = "block";
 
@@ -75,9 +83,11 @@ function setupAutocomplete() {
                     dropdown.querySelectorAll(".loc-dd-item[data-name]").forEach(item => {
                         item.addEventListener("click", function () {
                             const picked = this.getAttribute("data-name");
+                            const lat = this.getAttribute("data-lat");
+                            const lon = this.getAttribute("data-lon");
                             input.value = picked;
                             dropdown.style.display = "none";
-                            updateLocationDisplay(picked);
+                            updateLocationDisplay(picked, lat, lon);
                             if (typeof closeModal === "function") closeModal("locationModal");
                         });
                     });
@@ -103,6 +113,7 @@ function setupAutocomplete() {
             const val = input.value.trim();
             if (!val) return;
             dropdown.style.display = "none";
+            // We don't have lat/lon for manual unstructured entry, so just update name
             updateLocationDisplay(val);
             if (typeof closeModal === "function") closeModal("locationModal");
         }
@@ -149,9 +160,9 @@ window.useGPSLocation = function () {
                     const uniqueParts = [...new Set(parts)];
                     const name = uniqueParts.join(", ") || "Unknown Location";
 
-                    updateLocationDisplay(name);
+                    updateLocationDisplay(name, lat, lng);
                     if (typeof closeModal === "function") closeModal("locationModal");
-                }).catch(() => updateLocationDisplay("Unavailable"));
+                }).catch(() => updateLocationDisplay("Unavailable", lat, lng));
         },
         () => { updateLocationDisplay("GPS Denied/Unavailable"); }
     );
@@ -160,8 +171,11 @@ window.useGPSLocation = function () {
 /* Auto-initialize on page load */
 document.addEventListener("DOMContentLoaded", () => {
     const saved = localStorage.getItem("user_location");
-    if (saved) {
-        updateLocationDisplay(saved);
+    const savedLat = localStorage.getItem("user_lat");
+    if (saved && savedLat) {
+        updateLocationDisplay(saved, localStorage.getItem("user_lat"), localStorage.getItem("user_lon"));
+    } else if (saved) {
+        updateLocationDisplay(saved); // backwards compatibility if lat/lon not saved previously
     } else if (document.getElementById("locationDisplay")) {
         window.useGPSLocation();
     }
