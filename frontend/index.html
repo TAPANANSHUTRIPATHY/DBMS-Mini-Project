@@ -214,6 +214,27 @@
 
   </div>
 
+  </div>
+
+  <!-- FULL DAY MASTER GRAPH -->
+  <div class="section-label"><span>TODAY'S MASTER GRAPH (00:00 - 23:59)</span></div>
+  <div class="graph-tiles">
+    <div class="tile" id="tileMasterGraph" style="grid-column: 1 / -1;">
+      <div class="tile-header">
+        <div class="tile-title-group">
+          <span class="tile-dot temp-c"></span>
+          <span class="tile-dot hum-c"></span>
+          <span class="tile-dot" style="background:#00ff88;box-shadow:0 0 6px #00ff88;"></span>
+          <h3>Full Day Sensor Master Graph — From DB</h3>
+        </div>
+        <div class="tile-actions">
+          <button class="fullscreen-btn" onclick="openMasterModal()" title="Fullscreen">&#10559;</button>
+        </div>
+      </div>
+      <div class="tile-chart-wrap" style="height: 280px;"><canvas id="masterForeChart"></canvas></div>
+    </div>
+  </div>
+
   <!-- REAL-TIME ANALYTICS -->
   <div class="section-label"><span>REAL-TIME ANALYTICS</span></div>
   <div class="graph-tiles">
@@ -267,6 +288,41 @@
 
 
 
+  <!-- 7-DAY HISTORY -->
+  <div class="section-label"><span>LAST 7 DAYS (DAILY AVERAGE)</span></div>
+  <div class="graph-tiles" id="forecastSection">
+
+    <div class="tile" id="tileForeTemp">
+      <div class="tile-header">
+        <div class="tile-title-group"><span class="tile-dot temp-c"></span>
+          <h3>Temperature &mdash; 7-Day Avg</h3>
+        </div>
+      </div>
+      <div class="tile-chart-wrap"><canvas id="foreTempChart"></canvas></div>
+    </div>
+
+    <div class="tile" id="tileForeHum">
+      <div class="tile-header">
+        <div class="tile-title-group"><span class="tile-dot hum-c"></span>
+          <h3>Humidity &mdash; 7-Day Avg</h3>
+        </div>
+      </div>
+      <div class="tile-chart-wrap"><canvas id="foreHumChart"></canvas></div>
+    </div>
+
+    <div class="tile tile-aqi-center" id="tileForeAqi">
+      <div class="tile-header">
+        <div class="tile-title-group"><span class="tile-dot aqi-c"></span>
+          <h3>Air Quality Index &mdash; 7-Day Avg</h3>
+        </div>
+      </div>
+      <div class="tile-chart-wrap"><canvas id="foreAqiChart"></canvas></div>
+    </div>
+
+  </div>
+
+
+
   <!-- MODALS -->
   <div id="tempModal" class="modal" onclick="if(event.target===this)closeModal('tempModal')">
     <div class="modal-content">
@@ -298,6 +354,16 @@
     </div>
   </div>
 
+  <div id="masterModal" class="modal" onclick="if(event.target===this)closeModal('masterModal')">
+    <div class="modal-content" style="max-width:1100px;">
+      <div class="modal-head">
+        <h3 class="modal-title">Full Day Sensor Master Graph &mdash; Full View</h3>
+        <span class="close" onclick="closeModal('masterModal')">&#10005;</span>
+      </div>
+      <div class="modal-chart-wrap" style="height:500px;"><canvas id="masterLargeCanvas"></canvas></div>
+    </div>
+  </div>
+
   <div id="locationModal" class="modal" onclick="if(event.target===this)closeModal('locationModal')">
     <div class="modal-content location-modal-content">
       <div class="modal-head location-modal-head">
@@ -324,9 +390,12 @@
 
 
 
+  <!-- Expose API URL globally for forecast.js -->
+  <script>window._ENVCORE_API_URL = "https://dbms-mini-project-vgp4.onrender.com/api";</script>
   <script src="location.js"></script>
   <script src="script.js"></script>
   <script src="charts.js"></script>
+  <script src="forecast.js"></script>
 </body>
 
 </html>
