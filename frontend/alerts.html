@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ENVCORE — Alert System</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="alerts-page.css">
+    <link rel="icon" href="assets/meteorology.png" type="image/png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Rajdhani:wght@300;400;500;600&display=swap"
+        rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+</head>
+
+<body>
+
+    <canvas id="bgCanvas"></canvas>
+    <div class="scanlines"></div>
+
+    <!-- HEADER -->
+    <header>
+        <div class="header-left">
+            <div class="logo-mark">
+                <span class="logo-pulse"></span>
+                <svg viewBox="0 0 28 28" class="logo-svg">
+                    <polygon points="14,2 26,8 26,20 14,26 2,20 2,8" fill="none" stroke="currentColor"
+                        stroke-width="1.5" />
+                    <circle cx="14" cy="14" r="4" fill="currentColor" />
+                </svg>
+            </div>
+            <div class="logo-text">ENV<span class="accent">CORE</span></div>
+        </div>
+
+        <div class="header-center">
+            <h1>Alert System</h1>
+            <div class="header-meta">
+                <span id="clockDisplay" class="clock">--:--:--</span>
+                <span class="sep">|</span>
+                <div class="live-badge"><span class="live-dot"></span>LIVE</div>
+            </div>
+        </div>
+
+        <div class="header-right">
+            <a href="index.html" class="nav-btn">&#8592; Live Monitor</a>
+            <a href="dashboard.html" class="nav-btn">&#128202; Dashboard</a>
+            <button class="theme-btn" id="themeToggle" title="Toggle theme">
+                <span class="theme-icon">&#9728;</span>
+                <span class="theme-icon">&#9789;</span>
+                <span class="theme-slider"></span>
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT -->
+    <div class="alerts-wrap">
+
+        <!-- LEFT COLUMN: Settings -->
+        <div class="alerts-col">
+
+            <!-- AQI STATUS BANNER -->
+            <div class="aqi-live-banner" id="aqiBanner">
+                <div class="aql-left">
+                    <span class="aql-icon">📡</span>
+                    <div>
+                        <div class="aql-label">LIVE AQI</div>
+                        <div class="aql-val" id="liveAqi">--</div>
+                    </div>
+                </div>
+                <div class="aql-status" id="liveAqiStatus">Fetching...</div>
+                <div class="aql-threshold">
+                    Threshold: <strong id="bannerThreshold">150</strong>
+                </div>
+            </div>
+
+            <!-- THRESHOLD CARD -->
+            <div class="al-card">
+                <div class="al-card-header">
+                    <span class="al-card-icon">⚡</span>
+                    <div class="al-card-title">AQI Alert Threshold</div>
+                </div>
+                <div class="thresh-row">
+                    <button class="thresh-btn" data-val="100">100</button>
+                    <button class="thresh-btn" data-val="120">120</button>
+                    <button class="thresh-btn active" data-val="150">150</button>
+                    <button class="thresh-btn" data-val="200">200</button>
+                </div>
+                <div class="al-custom-row">
+                    <span class="al-input-label">Custom:</span>
+                    <input type="number" id="customThreshold" class="al-input al-input-sm" placeholder="e.g. 175"
+                        min="1" max="500">
+                    <span class="al-input-unit">AQI</span>
+                </div>
+                <div class="thresh-desc" id="threshDesc">Alert fires when AQI exceeds <strong>150</strong></div>
+            </div>
+
+            <!-- EMAIL CARD -->
+            <div class="al-card">
+                <div class="al-card-header">
+                    <span class="al-card-icon">📧</span>
+                    <div class="al-card-title">Email Alerts</div>
+                </div>
+                <div class="al-field-group">
+                    <label class="al-label">Send alerts to this email</label>
+                    <input type="email" id="alertEmail" class="al-input" placeholder="you@example.com">
+                </div>
+                <div class="al-field-group">
+                    <label class="al-label">Email subject (use {aqi}, {threshold}, {level}, {time})</label>
+                    <input type="text" id="emailSubject" class="al-input"
+                        placeholder="🚨 ENVCORE Alert — AQI {aqi} exceeded {threshold}">
+                </div>
+                <div class="al-field-group">
+                    <label class="al-label">Email body (edit freely)</label>
+                    <textarea id="emailBody" class="al-textarea" rows="5"
+                        placeholder="⚠️ Air Quality Alert!&#10;&#10;Current AQI: {aqi}&#10;Threshold: {threshold}&#10;Level: {level}&#10;Time: {time}&#10;&#10;— ENVCORE IoT Dashboard"></textarea>
+                    <div class="al-hint">Placeholders: <code>{aqi}</code> <code>{threshold}</code> <code>{level}</code>
+                        <code>{time}</code>
+                    </div>
+                </div>
+                <div class="al-btn-row">
+                    <button class="al-test-btn" id="testEmailBtn">📧 Send Test Email</button>
+                    <span class="al-status-badge" id="emailStatus"></span>
+                </div>
+            </div>
+
+            <!-- SMS CARD -->
+            <div class="al-card">
+                <div class="al-card-header">
+                    <span class="al-card-icon">📱</span>
+                    <div class="al-card-title">SMS Alerts (Fast2SMS — India)</div>
+                </div>
+                <div class="al-field-group">
+                    <label class="al-label">Send SMS to this number</label>
+                    <input type="tel" id="alertPhone" class="al-input" placeholder="Indian mobile number (10 digits)">
+                </div>
+                <div class="al-field-group">
+                    <label class="al-label">SMS message (edit freely)</label>
+                    <textarea id="smsBody" class="al-textarea" rows="3"
+                        placeholder="ENVCORE: AQI {aqi} exceeded {threshold}. Level: {level}. Time: {time}"></textarea>
+                    <div class="al-hint">Placeholders: <code>{aqi}</code> <code>{threshold}</code> <code>{level}</code>
+                        <code>{time}</code>
+                    </div>
+                </div>
+                <div class="al-btn-row">
+                    <button class="al-test-btn" id="testSmsBtn">📱 Send Test SMS</button>
+                    <span class="al-status-badge" id="smsStatus"></span>
+                </div>
+            </div>
+
+            <!-- SAVE BUTTON -->
+            <button class="al-save-btn" id="saveBtn">💾 Save All Settings</button>
+
+        </div>
+
+        <!-- RIGHT COLUMN: History + API Setup -->
+        <div class="alerts-col">
+
+            <!-- ALERT HISTORY -->
+            <div class="al-card al-card-history">
+                <div class="al-card-header">
+                    <span class="al-card-icon">📋</span>
+                    <div class="al-card-title">Alert History</div>
+                    <div class="al-header-actions">
+                        <span class="al-history-count" id="historyCount">0 alerts</span>
+                        <button class="al-clear-btn" id="clearHistoryBtn">🗑️ Clear</button>
+                    </div>
+                </div>
+                <div id="alertHistoryList" class="ah-list">
+                    <div class="ah-empty">
+                        <div class="ah-empty-icon">🔔</div>
+                        <div>No alerts triggered yet</div>
+                        <div class="ah-empty-sub">Alerts will appear here when AQI exceeds your threshold</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- API SETUP GUIDE -->
+            <div class="al-card al-card-setup">
+                <div class="al-card-header">
+                    <span class="al-card-icon">🔑</span>
+                    <div class="al-card-title">API Key Setup</div>
+                    <span class="al-required-tag">Required once</span>
+                </div>
+
+                <div class="setup-section">
+                    <div class="setup-title">📧 EmailJS (Free — 200 emails/month)</div>
+                    <ol class="setup-steps">
+                        <li>Sign up at <a href="https://www.emailjs.com" target="_blank" class="al-link">emailjs.com</a>
+                        </li>
+                        <li>Add an Email Service → connect Gmail/Outlook</li>
+                        <li>Create Email Template — use variables:<br>
+                            <code>{{to_email}}</code> <code>{{subject}}</code> <code>{{message}}</code>
+                            <code>{{from_name}}</code>
+                        </li>
+                        <li>Copy Service ID, Template ID, Public Key</li>
+                        <li>Open <code>alerts-page.js</code> and paste below the <strong>▼ PASTE HERE</strong> comment
+                        </li>
+                    </ol>
+                    <div class="setup-code">
+                        const EMAILJS_SERVICE_ID = 'service_xxxxx';
+                        const EMAILJS_TEMPLATE_ID = 'template_xxxxx';
+                        const EMAILJS_PUBLIC_KEY = 'your_public_key';</div>
+                </div>
+
+                <div class="setup-divider"></div>
+
+                <div class="setup-section">
+                    <div class="setup-title">📱 Fast2SMS (Free ₹50 credit, India)</div>
+                    <ol class="setup-steps">
+                        <li>Sign up at <a href="https://www.fast2sms.com" target="_blank"
+                                class="al-link">fast2sms.com</a></li>
+                        <li>Go to <strong>Dev API</strong> → copy your Authorization key</li>
+                        <li>Open <code>alerts-page.js</code> and paste:</li>
+                    </ol>
+                    <div class="setup-code">const FAST2SMS_API_KEY = 'your_key_here';</div>
+                </div>
+            </div>
+
+        </div>
+
+    </div><!-- /.alerts-wrap -->
+
+    <!-- TOAST CONTAINER -->
+    <div id="toastContainer"></div>
+
+    <script src="location.js" defer></script>
+    <script src="alerts-page.js" defer></script>
+</body>
+
+</html>
