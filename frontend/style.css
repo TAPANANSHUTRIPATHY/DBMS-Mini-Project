@@ -2746,7 +2746,7 @@ h1 {
 .device-status-panel {
   display: flex;
   align-items: center;
-  gap: 0;
+  justify-content: space-evenly;
   background: linear-gradient(135deg, var(--surface), var(--bg2));
   border-top: none;
   border-bottom: 1px solid var(--border);
@@ -2754,7 +2754,6 @@ h1 {
   position: relative;
   z-index: 3;
   flex-wrap: wrap;
-  gap: 4px;
 }
 
 .dsp-item {

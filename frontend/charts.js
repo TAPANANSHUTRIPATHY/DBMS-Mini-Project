@@ -46,7 +46,7 @@
           label, borderColor: color,
           backgroundColor: rgba(color, 0.12), data: [], tension: 0.4,
           pointRadius: 2, pointHoverRadius: 7, pointBackgroundColor: color,
-          fill: true, borderWidth: 2
+          fill: true, borderWidth: 2, spanGaps: true
         }]
       },
       options: {
@@ -80,7 +80,8 @@
       data: {
         labels: [], datasets: [{
           data: [], borderColor: color,
-          backgroundColor: rgba(color, 0.1), borderWidth: 1.5, pointRadius: 0, fill: true, tension: 0.4
+          backgroundColor: rgba(color, 0.1), borderWidth: 1.5, pointRadius: 0, fill: true, tension: 0.4,
+          spanGaps: true
         }]
       },
       options: {
@@ -237,12 +238,8 @@
     _syncCount++;
     const D = window.ENVDATA;
 
-    /* Backend offline: clear everything and show "--" */
-    if (!D || !D.ready || !D.backendOnline) {
-      if (_lastSyncTs !== "OFFLINE") {
-        _lastSyncTs = "OFFLINE";
-        clearAllCharts();
-      }
+    /* Data not ready yet */
+    if (!D || !D.ready) {
       return;
     }
 
@@ -259,16 +256,14 @@
 
     if (isNaN(latestTemp) || isNaN(latestHum) || isNaN(latestAqi)) return;
 
-    /* Humidity chart tile — only redraw when new data arrives */
-    if (hasNew) {
-      mirror(humLineChart, labels, hums);
-      mirror(tempLargeChart, labels, temps);
-      mirror(humLargeChart, labels, hums);
-      mirror(airLargeChart, labels, aqis);
-      mirror(tempSpk, labels, temps);
-      mirror(humSpk, labels, hums);
-      mirror(airSpk, labels, aqis);
-    }
+    /* Always redraw charts so they don't vanish or break randomly when backend is quiet. */
+    mirror(humLineChart, labels, hums);
+    mirror(tempLargeChart, labels, temps);
+    mirror(humLargeChart, labels, hums);
+    mirror(airLargeChart, labels, aqis);
+    mirror(tempSpk, labels, temps);
+    mirror(humSpk, labels, hums);
+    mirror(airSpk, labels, aqis);
 
     /* Health ring — MUST be called every sync */
     updateHealth(latestTemp, latestHum, latestAqi);
