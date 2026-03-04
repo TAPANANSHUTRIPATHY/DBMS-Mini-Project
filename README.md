@@ -167,13 +167,20 @@ DBMS-Mini-Project/
 ├── ESP 32 Codes/               # 🔌 All ESP32 Arduino sketches
 │
 ├── frontend/                   # 🎨 Netlify deployed dashboard
-│   ├── charts.js
-│   ├── dashboard.css
+│   ├── alerts.html             # SMS & Email alerts config page
+│   ├── alerts.js               # Global alert checking logic
+│   ├── alerts-page.js          # Settings & API configuration logic
+│   ├── alerts-page.css         # Styling for alerts page
+│   ├── assets/                 # Icons and image assets
+│   ├── charts.js               # Chart.js initialization and updates
+│   ├── dashboard.css           # Styling for historical dashboard
 │   ├── dashboard.html          # Historical data dashboard page
-│   ├── dashboard.js
+│   ├── dashboard.js            # Historical data fetching logic
+│   ├── forecast.js             # 24-hour predictive/historical charts
 │   ├── index.html              # Live monitor page
-│   ├── script.js
-│   └── style.css
+│   ├── location.js             # Location detection & Geocoding logic
+│   ├── script.js               # Live data polling and main UI logic
+│   └── style.css               # Main styling for live dashboard
 │
 ├── Research Papers/            # 📚 Reference research papers
 │
@@ -480,8 +487,8 @@ Wait 5 Seconds → LOOP ↑
 | 🟢 Phase 4 | Production Backend | ✅ Complete |
 | 🟢 Phase 5–6 | Cloud Deployment | ✅ Complete |
 | 🟢 Phase 7–8 | Frontend + Netlify Integration | ✅ Complete |
-| 🟢 Phase 9 | Frontend Improvements & Sensor Calibrations | On Progress |
-| 🟡 Phase 10 | SMS & Email Facility Integration | 🔄 Planned |
+| 🟢 Phase 9 | Frontend Improvements & Sensor Calibrations | ✅ Complete |
+| 🟢 Phase 10 | SMS & Email Facility Integration | ✅ Complete |
 | 🟡 Phase 11 | Advanced Analytics & ML | 🔄 Planned |
 
 ---
