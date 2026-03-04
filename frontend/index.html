@@ -118,6 +118,8 @@
 
     <!-- Health Ring -->
     <div class="health-ring-block">
+      <!-- Settings Icon for Health Score configurability -->
+      <div class="health-settings-icon" data-modal="healthSettingsModal" title="Configure Ideal Health Values">⚙️</div>
       <div class="health-ring-wrap">
         <canvas id="healthRing" width="220" height="220"></canvas>
         <div class="health-center">
@@ -128,11 +130,12 @@
         <div class="health-ring-glow"></div>
       </div>
       <div class="health-legend">
-        <div class="hl-item"><span class="hl-dot temp-c"></span><span>Temperature</span><strong id="hlTemp">--</strong>
-        </div>
-        <div class="hl-item"><span class="hl-dot hum-c"></span><span>Humidity</span><strong id="hlHum">--</strong></div>
-        <div class="hl-item"><span class="hl-dot aqi-c"></span><span>Air Quality</span><strong id="hlAqi">--</strong>
-        </div>
+        <div class="hl-item"><span class="hl-dot temp-c"></span><span>Temperature</span><strong id="hlTemp"
+            title="Based on ideal temperature. Hover settings gear to edit." style="cursor:help">--</strong></div>
+        <div class="hl-item"><span class="hl-dot hum-c"></span><span>Humidity</span><strong id="hlHum"
+            title="Based on ideal humidity. Hover settings gear to edit." style="cursor:help">--</strong></div>
+        <div class="hl-item"><span class="hl-dot aqi-c"></span><span>Air Quality</span><strong id="hlAqi"
+            title="Based on max AQI tolerance. Hover settings gear to edit." style="cursor:help">--</strong></div>
       </div>
     </div>
 
@@ -413,6 +416,49 @@
         <span class="close" data-modal="masterModal">&#10005;</span>
       </div>
       <div class="modal-chart-wrap modal-chart-tall"><canvas id="masterLargeCanvas"></canvas></div>
+    </div>
+  </div>
+
+  <!-- HEALTH SETTINGS MODAL -->
+  <div id="healthSettingsModal" class="modal">
+    <div class="modal-content location-modal-content">
+      <div class="modal-head location-modal-head">
+        <h3 class="modal-title">Configure Ideal Health Values</h3>
+        <span class="close" data-modal="healthSettingsModal">&#10005;</span>
+      </div>
+      <div class="location-modal-body" style="text-align: left; padding: 0 4px;">
+        <p style="color: var(--text-dim); font-size: 13px; margin-bottom: 20px; line-height: 1.4;">
+          The Health Score is calculated out of 100 based on how close the live readings are to your defined "Ideal"
+          values.
+        </p>
+
+        <div style="margin-bottom: 15px;">
+          <label
+            style="display:block; font-size: 11px; color: var(--cyan); letter-spacing: 1px; margin-bottom: 6px;">IDEAL
+            TEMPERATURE (°C)</label>
+          <input type="number" id="idealTempInput" class="location-input" value="22" step="0.5">
+          <div style="font-size: 11px; color: #888; margin-top: 4px;">Score drops by 4pts for every 1°C deviation.</div>
+        </div>
+
+        <div style="margin-bottom: 15px;">
+          <label
+            style="display:block; font-size: 11px; color: var(--cyan); letter-spacing: 1px; margin-bottom: 6px;">IDEAL
+            HUMIDITY (%)</label>
+          <input type="number" id="idealHumInput" class="location-input" value="50" step="1">
+          <div style="font-size: 11px; color: #888; margin-top: 4px;">Score drops by 2pts for every 1% deviation.</div>
+        </div>
+
+        <div style="margin-bottom: 24px;">
+          <label
+            style="display:block; font-size: 11px; color: var(--cyan); letter-spacing: 1px; margin-bottom: 6px;">MAX
+            TOLERABLE AQI</label>
+          <input type="number" id="maxAqiInput" class="location-input" value="500" step="10">
+          <div style="font-size: 11px; color: #888; margin-top: 4px;">Score drops to 0 if AQI reaches this maximum
+            value.</div>
+        </div>
+
+        <button id="saveHealthSettingsBtn" class="location-btn save-btn">Save Configuration</button>
+      </div>
     </div>
   </div>
 

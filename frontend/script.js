@@ -32,7 +32,7 @@ const airGaugeValue = document.getElementById("airGaugeValue");
 function getAirStatus(v) {
   if (v <= 50) return { text: "🟢 Good", color: "#00ff88" };
   if (v <= 100) return { text: "🟡 Moderate", color: "#ffcc00" };
-  if (v <= 150) return { text: "🟠 Unhealthy for Sensitive", color: "#ff9900" };
+  if (v <= 150) return { text: "🟠 Unhealthy (Sensitive)", color: "#ff9900" };
   if (v <= 200) return { text: "🔴 Unhealthy", color: "#ff4d4d" };
   if (v <= 300) return { text: "🟣 Very Unhealthy", color: "#cc0099" };
   return { text: "🟤 Hazardous", color: "#800000" };
