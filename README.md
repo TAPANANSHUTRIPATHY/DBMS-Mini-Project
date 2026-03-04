@@ -352,6 +352,23 @@ Full Render backend + Netlify deployment with confirmed live data flow, polished
 
 ---
 
+### 🟢 Phase 9 — Frontend Optimization & Localization
+
+Focused on highly improving data loading speeds, graph visualization, and localization without paid APIs.
+- **24-Hour Master Chart:** Pinned a fixed `00:00–23:00` axis where missing records render accurately as line gaps (`spanGaps: false`). Removed chart animation delays for instant rendering.
+- **Parallel Fetch & Caching:** Routed around API latency by racing endpoints (`Promise.any()`) and caching raw data for 60 seconds, preventing redundant network calls when switching dates or auto-refreshing.
+- **Keyless Geocoding API:** Migrated from Google Maps to totally free APIs using Photon (OSM) for location autocomplete and BigDataCloud for precise reverse-geocoding without API keys.
+
+---
+
+### 🟢 Phase 10 — Serverless Alerting System (Email & SMS)
+
+Allows users to receive direct notifications for bad AQI thresholds purely via the frontend, avoiding backend mailing infrastructure.
+- **EmailJS Integration:** Built a fully client-side alerting framework hooking into `EmailJS`, dynamically passing customized text blocks (`{{aqi}}`, `{{threshold}}`) whenever the dashboard picks up hazardous spikes.
+- **SMS Gateway Routing [Testing]:** Overcame global CORS limits and restrictive third-party REST APIs by routing free SMS alerts through standard mobile carrier email-to-SMS gateways straight from the browser.
+
+---
+
 ## 📡 Production API Endpoints
 
 | Method | Endpoint | Description |
@@ -488,8 +505,17 @@ Wait 5 Seconds → LOOP ↑
 | 🟢 Phase 5–6 | Cloud Deployment | ✅ Complete |
 | 🟢 Phase 7–8 | Frontend + Netlify Integration | ✅ Complete |
 | 🟢 Phase 9 | Frontend Improvements & Sensor Calibrations | ✅ Complete |
-| 🟢 Phase 10 | SMS & Email Facility Integration | ✅ Complete |
-| 🟡 Phase 11 | Advanced Analytics & ML | 🔄 Planned |
+| 🟢 Phase 10 | SMS (under testing phase) & Email Facility Integration | ✅ Complete |
+| 🟡 Phase 11 | User Authentication & Role-Based Access + Dashboard UI Revamp | 🔄 Planned |
+| 🟡 Phase 12 | Advanced Data Analytics & Reporting + Interactive Charting Upgrade | 🔄 Planned |
+| 🟡 Phase 13 | Multi-Sensor Node Support (Scaling) + Map View Integration | 🔄 Planned |
+| 🟡 Phase 14 | Predictive ML Model for AQI Forecasting + Forecast Trend Visuals | 🔄 Planned |
+| 🟡 Phase 15 | MQTT Protocol Migration for IoT Messaging + Real-Time UI Sync Optimization | 🔄 Planned |
+| 🟡 Phase 16 | Web & App Push Notifications for AQI Alerts + Notification Center UI | 🔄 Planned |
+| 🟡 Phase 17 | Mobile Application (React Native / Flutter) + Responsive Layout Refinements | 🔄 Planned |
+| 🟡 Phase 18 | Admin Dashboard for Device Management + Admin Control Panel UI | 🔄 Planned |
+| 🟡 Phase 19 | Edge Computing Layer & Offline Data Sync + Offline Mode Indicators | 🔄 Planned |
+| 🟡 Phase 20 | Full CI/CD Pipeline & Automated Testing + Accessibility (a11y) Improvements | 🔄 Planned |
 
 ---
 
@@ -510,6 +536,9 @@ Wait 5 Seconds → LOOP ↑
 **Tapananshu Tripathy**
 B.Tech — Computer Science & Engineering
 KIIT University, Bhubaneswar, Odisha
+
+**Under the Supervision of:**
+**Prof. Vijay Kumar Meena**
 
 ---
 
