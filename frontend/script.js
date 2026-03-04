@@ -38,16 +38,8 @@ function getAirStatus(v) {
   return { text: "🟤 Hazardous", color: "#800000" };
 }
 
-/* ── Show "--" on all cards when offline ── */
+/* ── Retain last values but show offline status ── */
 function showOffline() {
-  if (tempEl) tempEl.textContent = "-- °C";
-  if (humEl) humEl.textContent = "-- %";
-  if (airEl) airEl.textContent = "--";
-  if (airStatusEl) airStatusEl.textContent = "--";
-  if (tempGaugeValue) tempGaugeValue.textContent = "--";
-  if (airGaugeValue) airGaugeValue.textContent = "--";
-  window.ENVDATA.backendOnline = false;
-  window.ENVDATA.ready = false;
   /* Device Status Panel — Offline */
   const dot = document.getElementById('dspDot');
   const status = document.getElementById('dspStatus');
@@ -164,7 +156,10 @@ function rebuildTicker() {
 
   const sep = '        •        ';
   const seg = parts.join(sep) + '                    ';
-  textEl.textContent = seg + seg; // duplicate for seamless loop
+  const newText = seg + seg; // duplicate for seamless loop
+  if (textEl.textContent !== newText) {
+    textEl.textContent = newText;
+  }
 
   const color = (_tickerStatus?.color) ?? '#00e5ff';
   banner.style.setProperty('--alert-color', color);
@@ -201,7 +196,7 @@ let lastDataTime = 0;  // epoch ms of last successful data point
 function checkDeviceTimeout() {
   if (!lastDataTime) return; // not received any data yet
   const elapsed = Date.now() - lastDataTime;
-  const OFFLINE_AFTER = 40 * 1000; // 40 seconds
+  const OFFLINE_AFTER = 6 * 60 * 1000; // 6 minutes
   if (elapsed > OFFLINE_AFTER) {
     const dot = document.getElementById('dspDot');
     const status = document.getElementById('dspStatus');
@@ -225,7 +220,7 @@ function makeLineChart(id, label, color, yMin, yMax, yStep) {
       labels: [], datasets: [{
         label, borderColor: color, backgroundColor: fill,
         data: [], tension: 0.4, pointRadius: 1.5, pointHoverRadius: 6,
-        pointBackgroundColor: color, fill: true, borderWidth: 2
+        pointBackgroundColor: color, fill: true, borderWidth: 2, spanGaps: true
       }]
     },
     options: {
@@ -306,7 +301,7 @@ async function fetchLatest() {
     const dspLastData = document.getElementById('dspLastData');
 
     const dataAgeMs = d.created_at ? Date.now() - new Date(d.created_at).getTime() : Infinity;
-    const DEVICE_STALE_MS = 40 * 1000; // 40 seconds
+    const DEVICE_STALE_MS = 6 * 60 * 1000; // 6 minutes
 
     if (dataAgeMs <= DEVICE_STALE_MS) {
       // Fresh data — ESP is Online
