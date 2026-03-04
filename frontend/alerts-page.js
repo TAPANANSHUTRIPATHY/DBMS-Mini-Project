@@ -16,10 +16,10 @@
    ══════════════════════════════════════════════════════════════ */
 
 /* ▼▼▼ PASTE YOUR KEYS HERE ▼▼▼ */
-const EMAILJS_SERVICE_ID = 'YOUR_SERVICE_ID';   // e.g. 'service_abc123'
-const EMAILJS_TEMPLATE_ID = 'YOUR_TEMPLATE_ID';  // e.g. 'template_xyz789'
-const EMAILJS_PUBLIC_KEY = 'YOUR_PUBLIC_KEY';    // e.g. 'AbCdEfGhIj...'
-const FAST2SMS_API_KEY = 'YOUR_FAST2SMS_KEY';  // e.g. 'aBcDeFgHiJ...'
+const EMAILJS_SERVICE_ID = 'service_yx0ey3b';   // e.g. 'service_abc123'
+const EMAILJS_TEMPLATE_ID = 'template_y1l9mmt';  // e.g. 'template_xyz789'
+const EMAILJS_PUBLIC_KEY = 'ECftLHDahALaBy8jt';    // e.g. 'AbCdEfGhIj...'
+const FAST2SMS_API_KEY = 'f3gcPA8RnUvowkFLiVduL5PTU8tuUsYvh5Y2PDsRLKUkwQznUSEuyt0IxqzV';  // e.g. 'aBcDeFgHiJ...'
 /* ▲▲▲ KEYS END ▲▲▲ */
 
 /* ── Constants ── */
@@ -177,7 +177,7 @@ async function sendSMS(aqi, threshold, level, isTest = false) {
     const msg = buildMsg(v('smsBody') || settings.smsBody, aqi, threshold, level);
 
     try {
-        const res = await fetch('https://www.fast2sms.com/dev/bulkV2', {
+        const res = await fetch('https://corsproxy.io/?https://www.fast2sms.com/dev/bulkV2', {
             method: 'POST',
             headers: { 'authorization': FAST2SMS_API_KEY, 'Content-Type': 'application/json' },
             body: JSON.stringify({ route: 'q', message: msg, language: 'english', flash: 0, numbers: phone }),
@@ -392,16 +392,20 @@ document.addEventListener('DOMContentLoaded', () => {
     // Save
     document.getElementById('saveBtn')?.addEventListener('click', saveSettings);
 
-    // Test email
-    document.getElementById('testEmailBtn')?.addEventListener('click', () => {
+    // Send Email (Manual trigger with live data)
+    document.getElementById('sendEmailBtn')?.addEventListener('click', () => {
         saveSettings();
-        sendEmail(settings.aqiThreshold + 1, settings.aqiThreshold, 'TEST ALERT', true);
+        const currentAqi = parseFloat(document.getElementById('liveAqi')?.textContent) || 0;
+        const currentLevel = document.getElementById('liveAqiStatus')?.textContent || 'Unknown';
+        sendEmail(currentAqi, settings.aqiThreshold, currentLevel, false);
     });
 
-    // Test SMS
-    document.getElementById('testSmsBtn')?.addEventListener('click', () => {
+    // Send SMS (Manual trigger with live data)
+    document.getElementById('sendSmsBtn')?.addEventListener('click', () => {
         saveSettings();
-        sendSMS(settings.aqiThreshold + 1, settings.aqiThreshold, 'TEST ALERT', true);
+        const currentAqi = parseFloat(document.getElementById('liveAqi')?.textContent) || 0;
+        const currentLevel = document.getElementById('liveAqiStatus')?.textContent || 'Unknown';
+        sendSMS(currentAqi, settings.aqiThreshold, currentLevel, false);
     });
 
     // Clear history
