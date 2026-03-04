@@ -95,7 +95,7 @@ This project demonstrates end-to-end engineering across:
 
 > Fully customizable front-end alert triggering configuration without full backend reliance.
 
-![ENVCORE Alert System](screenshots/envcore-alerts.png)
+![ENVCORE Alert System](screenshots/envcore-alert.png)
 
 **UI Highlights:**
 - � **Live AQI Monitor** — Displays current active AQI and visual threshold limit
@@ -148,28 +148,30 @@ This project demonstrates end-to-end engineering across:
 DBMS-Mini-Project/
 │
 ├── backend/                    # ✅ Production backend (deployed on Render)
-│   ├── backendespcode/
-│   ├── controllers/
-│   ├── routes/
-│   ├── node_modules/
-│   ├── .env
-│   ├── db.js
-│   ├── server.js
-│   ├── server-postman.js
-│   ├── package.json
-│   └── package-lock.json
+│   ├── backendespcode/         # Original ESP32 backend iteration
+│   │     └── backendespcode.ino
+│   ├── backendespcode_updated/ # Updated and enhanced ESP32 code logic
+│   │     └── backendespcode_updated.ino
+│   ├── controllers/            # Route handler logic and DB controls
+│   ├── ESP32_WeatherStation_WiFi_Supabase_Uploader/ # Direct ESP32 to Supabase DB uploader script
+│   │     └── ESP32_WeatherStation_WiFi_Supabase_Uploader.ino
+│   ├── routes/                 # Express API endpoint definitions
+│   ├── node_modules/           # Node.js dependencies
+│   ├── .env                    # Environment variables (DB URL, Port)
+│   ├── db.js                   # Database connection helper
+│   ├── server.js               # Main Express server entry point
+│   ├── server-postman.js       # Specialized server for Postman testing
+│   ├── package.json            # NPM project configuration
+│   └── package-lock.json       # Dependency tree lock
 │
 ├── backend-test/               # 🧪 Phase 1 isolated test environment
-│   ├── server-test.js
-│   ├── db-test.js
-│   ├── routes/
-│   │     └── sensorRoutes-test.js
-│   ├── controllers/
-│   │     └── sensorController-test.js
+│   ├── backend_esp_code_test/  # Test iterations of ESP32 connection code
+│   │     └── backend_esp_code.ino
+│   ├── server-test.js          # Entry point for isolated testing
+│   ├── db-test.js              # Connection to test PostgreSQL database
+│   ├── routes/                 # Testing environment routes
+│   ├── controllers/            # Testing environment controllers
 │   └── results/                # 📸 pgAdmin database verification screenshots
-│       ├── pg_admin_backend_test_DHT_11_temperature_graph.png
-│       ├── pg_admin_backend_test_DHT_11_humidity_graph.png
-│       └── pg_admin_backend_test_MQ135_air_quality_graph.png
 │
 ├── CSV Files/                  # 📊 Exported sensor data CSV files
 ├── Database Scripts/           # 🗄️ SQL scripts for schema setup
@@ -196,8 +198,6 @@ DBMS-Mini-Project/
 ├── Research Papers/            # 📚 Reference research papers
 │
 ├── screenshots/                # 📸 UI screenshots (used in this README)
-│   ├── envcore-live-monitor.png
-│   └── envcore-historical-dashboard.png
 │
 ├── .gitattributes
 ├── LICENSE
