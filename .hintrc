@@ -9,17 +9,6 @@
         "label": "off"
       }
     ],
-    "no-inline-styles": "off",
-    "compat-api/css": [
-      "default",
-      {
-        "ignore": [
-          "scrollbar-width",
-          "scrollbar-color",
-          "scrollbar-width: thin"
-        ]
-      }
-    ],
-    "css-prefix-order": "off"
+    "no-inline-styles": "off"
   }
 }

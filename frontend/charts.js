@@ -139,12 +139,20 @@
   }
 
   /* ================================================================
-     HEALTH RING
+     HEALTH RING (Customizable via localStorage)
   ================================================================ */
   function updateHealth(temp, hum, aqi) {
-    const ts = Math.max(0, 100 - Math.abs(temp - 22) * 4);
-    const hs = Math.max(0, 100 - Math.abs(hum - 50) * 2);
-    const as = Math.max(0, 100 - (aqi / 500) * 100);
+    const idealTemp = parseFloat(localStorage.getItem("ideal_temp")) || 22;
+    const idealHum = parseFloat(localStorage.getItem("ideal_hum")) || 50;
+    const maxAqi = parseFloat(localStorage.getItem("max_aqi")) || 500;
+
+    // Formulas:
+    // Temp drops 4 points per 1°C from ideal
+    // Hum drops 2 points per 1% from ideal
+    // AQI drops linearly to 0 at maxAqi
+    const ts = Math.max(0, 100 - Math.abs(temp - idealTemp) * 4);
+    const hs = Math.max(0, 100 - Math.abs(hum - idealHum) * 2);
+    const as = Math.max(0, 100 - (aqi / maxAqi) * 100);
     const score = Math.round((ts + hs + as) / 3);
     setEl("healthScore", score);
 
@@ -167,9 +175,19 @@
       ];
       healthChart.update("none");
     }
+
+    // Set legend values back to calculated sub-scores for "Health Score breakdown" 
     setEl("hlTemp", Math.round(ts));
     setEl("hlHum", Math.round(hs));
     setEl("hlAqi", Math.round(as));
+
+    // Update tooltips to explain the "ideal" value being used
+    const elTemp = document.getElementById("hlTemp");
+    const elHum = document.getElementById("hlHum");
+    const elAqi = document.getElementById("hlAqi");
+    if (elTemp) elTemp.title = `Score out of 100 based on Ideal Temp: ${idealTemp}°C`;
+    if (elHum) elHum.title = `Score out of 100 based on Ideal Humidity: ${idealHum}%`;
+    if (elAqi) elAqi.title = `Score out of 100 based on Max AQI tolerance: ${maxAqi}`;
   }
 
   /* ================================================================
@@ -475,5 +493,53 @@
       requestAnimationFrame(draw);
     })();
   })();
+
+  /* ================================================================
+     HEALTH SETTINGS MODAL BINDINGS
+  ================================================================ */
+  document.addEventListener("DOMContentLoaded", () => {
+    const sBtn = document.getElementById("saveHealthSettingsBtn");
+    const iT = document.getElementById("idealTempInput");
+    const iH = document.getElementById("idealHumInput");
+    const iA = document.getElementById("maxAqiInput");
+
+    // Load initial values to modal inputs
+    if (iT) iT.value = localStorage.getItem("ideal_temp") || 22;
+    if (iH) iH.value = localStorage.getItem("ideal_hum") || 50;
+    if (iA) iA.value = localStorage.getItem("max_aqi") || 500;
+
+    // Handle Save
+    if (sBtn) {
+      sBtn.addEventListener("click", () => {
+        localStorage.setItem("ideal_temp", iT.value);
+        localStorage.setItem("ideal_hum", iH.value);
+        localStorage.setItem("max_aqi", iA.value);
+
+        // Force immediate recalculation if data exists
+        const D = window.ENVDATA;
+        if (D && D.ready && D.temps.length) {
+          const t = D.temps[D.temps.length - 1];
+          const h = D.hums[D.hums.length - 1];
+          const a = D.aqis[D.aqis.length - 1];
+          updateHealth(t, h, a);
+        }
+
+        window.closeModal?.("healthSettingsModal");
+      });
+    }
+
+    // Modal open binding (global delegate)
+    document.addEventListener("click", (e) => {
+      const g = e.target.closest("[data-modal]");
+      if (g && g.dataset.modal === "healthSettingsModal") {
+        if (iT) iT.value = localStorage.getItem("ideal_temp") || 22;
+        if (iH) iH.value = localStorage.getItem("ideal_hum") || 50;
+        if (iA) iA.value = localStorage.getItem("max_aqi") || 500;
+        if (typeof window.openModal === "function") {
+          window.openModal("healthSettingsModal");
+        }
+      }
+    });
+  });
 
 })();
