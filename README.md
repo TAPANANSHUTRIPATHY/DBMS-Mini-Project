@@ -335,10 +335,13 @@ Full Render backend + Netlify deployment with confirmed live data flow, polished
 
 ### 🟢 Phase 9 — Frontend Optimization & Localization
 
-Focused on highly improving data loading speeds, graph visualization, and localization without paid APIs.
+Focused on highly improving data loading speeds, graph visualization, localization, and dashboard robustness.
 - **24-Hour Master Chart:** Pinned a fixed `00:00–23:00` axis where missing records render accurately as line gaps (`spanGaps: false`). Removed chart animation delays for instant rendering.
 - **Parallel Fetch & Caching:** Routed around API latency by racing endpoints (`Promise.any()`) and caching raw data for 60 seconds, preventing redundant network calls when switching dates or auto-refreshing.
 - **Keyless Geocoding API:** Migrated from Google Maps to totally free APIs using Photon (OSM) for location autocomplete and BigDataCloud for precise reverse-geocoding without API keys.
+- **Offline Resilience:** Increased the online/offline connection threshold to 6 minutes. Ensured that during temporary device offline states, the dashboard retains and displays the last known sensor data rather than clearing to empty states (`--`).
+- **Data Continuity in Graphs:** Fixed chart rendering logic so data lines remain continuous and do not vanish when new data points are temporarily unavailable.
+- **UI/UX Enhancements:** Removed the unused battery status display and optimized layout spacing. Eliminated flickering issues in the news ticker to ensure a smooth, professional data stream.
 
 ---
 
@@ -349,17 +352,7 @@ Allows users to receive direct notifications for bad AQI thresholds purely via t
 - **SMS Gateway Routing [Testing]:** Overcame global CORS limits and restrictive third-party REST APIs by routing free SMS alerts through standard mobile carrier email-to-SMS gateways straight from the browser.
 
 ---
-
-### � Phase 11 — Dashboard UI Polish & Robustness
-
-Focused on refining the frontend interface and improving the resilience of data displays:
-- **Offline Resilience:** Increased the online/offline connection threshold to 6 minutes. Ensured that during temporary device offline states, the dashboard retains and displays the last known sensor data rather than clearing to empty states (`--`).
-- **Data Continuity in Graphs:** Fixed chart rendering logic so data lines remain continuous and do not vanish when new data points are temporarily unavailable.
-- **UI/UX Enhancements:** Removed the unused battery status display and optimized layout spacing. Eliminated flickering issues in the news ticker to ensure a smooth, professional data stream.
-
----
-
-## �📡 Production API Endpoints
+## 📡 Production API Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -496,17 +489,16 @@ Wait 5 Seconds → LOOP ↑
 | 🟢 Phase 7–8 | Frontend + Netlify Integration | ✅ Complete |
 | 🟢 Phase 9 | Frontend Improvements & Sensor Calibrations | ✅ Complete |
 | 🟢 Phase 10 | SMS (under testing phase) & Email Facility Integration | ✅ Complete |
-| 🟢 Phase 11 | Dashboard UI Polish & Robustness | ✅ Complete |
-| 🟡 Phase 12 | User Authentication & Role-Based Access | 🔄 Planned |
-| 🟡 Phase 13 | Advanced Data Analytics & Reporting + Interactive Charting Upgrade | 🔄 Planned |
-| 🟡 Phase 14 | Multi-Sensor Node Support (Scaling) + Map View Integration | 🔄 Planned |
-| 🟡 Phase 15 | Predictive ML Model for AQI Forecasting + Forecast Trend Visuals | 🔄 Planned |
-| 🟡 Phase 16 | MQTT Protocol Migration for IoT Messaging + Real-Time UI Sync Optimization | 🔄 Planned |
-| 🟡 Phase 17 | Web & App Push Notifications for AQI Alerts + Notification Center UI | 🔄 Planned |
-| 🟡 Phase 18 | Mobile Application (React Native / Flutter) + Responsive Layout Refinements | 🔄 Planned |
-| 🟡 Phase 19 | Admin Dashboard for Device Management + Admin Control Panel UI | 🔄 Planned |
-| 🟡 Phase 20 | Edge Computing Layer & Offline Data Sync + Offline Mode Indicators | 🔄 Planned |
-| 🟡 Phase 21 | Full CI/CD Pipeline & Automated Testing + Accessibility (a11y) Improvements | 🔄 Planned |
+| � Phase 11 | User Authentication & Role-Based Access + Dashboard UI Revamp | 🔄 Planned |
+| 🟡 Phase 12 | Advanced Data Analytics & Reporting + Interactive Charting Upgrade | 🔄 Planned |
+| 🟡 Phase 13 | Multi-Sensor Node Support (Scaling) + Map View Integration | 🔄 Planned |
+| 🟡 Phase 14 | Predictive ML Model for AQI Forecasting + Forecast Trend Visuals | 🔄 Planned |
+| 🟡 Phase 15 | MQTT Protocol Migration for IoT Messaging + Real-Time UI Sync Optimization | 🔄 Planned |
+| 🟡 Phase 16 | Web & App Push Notifications for AQI Alerts + Notification Center UI | 🔄 Planned |
+| 🟡 Phase 17 | Mobile Application (React Native / Flutter) + Responsive Layout Refinements | 🔄 Planned |
+| 🟡 Phase 18 | Admin Dashboard for Device Management + Admin Control Panel UI | 🔄 Planned |
+| 🟡 Phase 19 | Edge Computing Layer & Offline Data Sync + Offline Mode Indicators | 🔄 Planned |
+| 🟡 Phase 20 | Full CI/CD Pipeline & Automated Testing + Accessibility (a11y) Improvements | 🔄 Planned |
 
 ---
 
