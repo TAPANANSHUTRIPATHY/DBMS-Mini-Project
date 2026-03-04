@@ -53,30 +53,27 @@ This project demonstrates end-to-end engineering across:
 
 ### Live Monitor — Smart Environmental Monitoring
 
-> Real-time sensor dashboard with live data streaming from ESP32 via the cloud.
+> Real-time sensor dashboard with live data streaming from ESP32 via the cloud, paired with advanced metric visualizations.
 
 ![ENVCORE Live Monitor](screenshots/envcore-live-monitor.png)
 
 **UI Highlights:**
-- 📍 **Location bar** — Shows *"Bhubaneswar Municipal Corporation, Odisha, India"* auto-detected
-- 🟢 **LIVE indicator** — Pulsing green dot with real-time clock (HH:MM:SS)
-- ⚠️ **Smart AQI Alert Banner** — Yellow warning bar: *"Air quality MODERATE: AQI 1091"*
-- 🎯 **Health Score Gauge** — Circular donut gauge (score: **75 — GOOD**) with color-coded segments for Temperature, Humidity, and Air Quality
+- 📍 **Weather Information Ticker** — Scrolling banner with auto-detected weather: *"Bhubaneswar • Clear sky • Temp: 24.7°C (Feels 29.1°C) • Humidity: 84% • Wind: 3 km/h • UV: 0.0 • Sensor AQI: 165 – Unhealthy"*
+- 🟢 **System Status Bar** — Shows Device Status (Online/Offline), Last Data sync timestamp, and Internet connection quality
+- 🎯 **Health Score Gauge** — Circular donut gauge (score: **65 — GOOD**) with color-coded segments for Temperature, Humidity, and Air Quality
 - 🃏 **Sensor Reading Cards** (3 interactive cards):
-  - 🌡️ Temperature: **28.3°C** with min/avg/max + sparkline trend chart
-  - 💧 Humidity: **43.8%** with min/avg/max + sparkline trend chart
-  - 🌫️ Air Quality Index: **1101 — Moderate** (highlighted with yellow glow border) with min/avg/max
-- 📈 **Real-Time Analytics** section with 3 live Chart.js time-series graphs:
-  - Temperature over time (red fill area)
-  - Humidity over time (cyan fill area)
-  - Air Quality Index over time (green fill area)
-- 🎛️ **Sensor Gauges** — 3 arc-style gauges at the bottom for Temperature, Humidity, and AQI with color coding
+  - 🌡️ Temperature: Live value with min/avg/max details + trend visualization
+  - 💧 Humidity: Live value with min/avg/max details + trend visualization
+  - 🌫️ Air Quality Index: Live value with min/avg/max details + categorized status (e.g., Unhealthy)
+- 📈 **Today's Master Graph (00:00 - 23:59)** — Combined 24-hour predictive and historical overlap chart for all 3 metrics with dynamic line rendering
+- � **Real-Time Analytics** — 3 live time-series graphs tracking immediate sensor state fluctuations and temporary offline gaps
+- 📅 **Last 7 Days (Daily Average)** — 3 smooth line charts showing week-long trend analysis for Temperature, Humidity, and AQI
 
 ---
 
 ### Historical Data Dashboard
 
-> Full historical analysis with date filtering, detailed data table, and CSV export.
+> Full historical analysis with date filtering, granular timeline visualization, and comprehensive data extrapolation.
 
 ![ENVCORE Historical Dashboard](screenshots/envcore-historical-dashboard.png)
 
@@ -84,14 +81,28 @@ This project demonstrates end-to-end engineering across:
 - 📅 **Date Filter Bar** — View by Today / Yesterday / 3 Days Ago with a custom date picker
 - 📤 **Download CSV** button for exporting all historical records
 - 📊 **4 Summary Cards** at the top:
-  - 🌡️ Temperature: **27.5°C** avg with min/max/timestamp
-  - 💧 Humidity: **56.3%** avg with min/max/timestamp
-  - 🌫️ Air Quality Index: **1454** avg with min/max/timestamp
-  - 💚 ENV Health Score: **72** — GOOD
-- 📈 **Temperature Over Time** graph (red)
-- 📈 **Humidity Over Time** graph (cyan)
-- 📈 **Air Quality Index Over Time** graph (green) — full width, clearly showing AQI drop from ~6000 → stabilizing ~1400 over time
-- 📋 **Detailed Records Table** — Paginated (Page 1 of 5, showing 1–50 of **396 records**) with columns: `#`, `Time`, `Temperature`, `Humidity`, `Air Quality`, `Health Score` with color-coded AQI badges: 🔴 Poor / 🟡 Moderate / 🟢 Good
+  - 🌡️ Temperature: Average with min/max bounds
+  - 💧 Humidity: Average with min/max bounds
+  - 🌫️ Air Quality Index: Average with min/max bounds
+  - 💚 ENV Health Score: Composite score out of 100
+- 📈 **Full Day - 24HR Master Graph** — Comprehensive overlap of Temperature, Humidity, and AQI over a full day
+- 📈 **Metric-Specific Over Time Graphs** — Area/line charts tracking Temperature, Humidity, and AQI specifically across the full timeline
+- � **Detailed Records Table** — Paginated component showing every single recorded timestamp, matching specific readings and health scores with color-coded AQI badges
+
+---
+
+### Alert System & Configuration
+
+> Fully customizable front-end alert triggering configuration without full backend reliance.
+
+![ENVCORE Alert System](screenshots/envcore-alerts.png)
+
+**UI Highlights:**
+- � **Live AQI Monitor** — Displays current active AQI and visual threshold limit
+- ⚙️ **AQI Alert Threshold Config** — Quick preset options (100, 120, 150, 200) and custom inputs to define alert trigger values
+- 📧 **Email Alerts Settings** — Fully editable email subject and rich body templates with dynamic placeholders like `{aqi}`, `{threshold}`, `{level}`, and `{time}`
+- 📱 **SMS Alerts Settings** — Configurable direct SMS alerts routing via cellular provider email gateways
+- � **Alert History Panel** — Scrollable history log storing timestamped threshold breach events with quick clear capability
 
 ---
 
