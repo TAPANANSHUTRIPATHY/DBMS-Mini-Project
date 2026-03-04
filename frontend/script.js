@@ -55,38 +55,32 @@ function showOffline() {
   if (status) status.textContent = 'Offline';
 }
 
-/* ── Health advice per AQI level ── */
+/* ================================================================
+   CITY WEATHER NEWS TICKER
+   Uses Open-Meteo (free, no key) + localStorage user_lat/user_lon
+================================================================ */
+
+const WMO_CODES = {
+  0: 'Clear sky', 1: 'Mostly clear', 2: 'Partly cloudy', 3: 'Overcast',
+  45: 'Foggy', 48: 'Icy fog', 51: 'Light drizzle', 53: 'Drizzle', 55: 'Heavy drizzle',
+  61: 'Light rain', 63: 'Rain', 65: 'Heavy rain', 71: 'Light snow', 73: 'Snow', 75: 'Heavy snow',
+  77: 'Snow grains', 80: 'Light showers', 81: 'Rain showers', 82: 'Heavy showers',
+  95: 'Thunderstorm', 96: 'Storm w/ hail', 99: 'Heavy storm',
+};
+const WMO_EMOJI = {
+  0: '☀️', 1: '🌤️', 2: '⛅', 3: '☁️', 45: '🌫️', 48: '🌫️',
+  51: '🌦️', 53: '🌦️', 55: '🌧️', 61: '🌧️', 63: '🌧️', 65: '🌧️',
+  71: '🌨️', 73: '❄️', 75: '❄️', 80: '🌦️', 81: '🌧️', 82: '🌧️',
+  95: '⛈️', 96: '⛈️', 99: '⛈️',
+};
+
 function getHealthAdvice(aqi) {
   if (aqi <= 50) return null;
-  if (aqi <= 100) return 'Sensitive groups should limit prolonged outdoor activity.';
-  if (aqi <= 150) return 'Unhealthy for sensitive groups — reduce outdoor activities, keep windows closed.';
-  if (aqi <= 200) return 'Unhealthy air — close windows, wear mask outdoors.';
-  if (aqi <= 300) return 'Very unhealthy — avoid outdoor activities, use air purifier indoors.';
-  return 'HAZARDOUS — stay indoors, seal windows, wear N95 mask if going out.';
-}
-
-/* ── Update the news-ticker alert banner ── */
-function showAlertBanner(aqi, statusObj) {
-  const banner = document.getElementById('alertBanner');
-  const textEl = document.getElementById('alertText');
-  if (!banner || !textEl) return;
-
-  const level = getAirLevelName(aqi);
-  const advice = getHealthAdvice(aqi);
-
-  if (!advice) {
-    banner.classList.add('hidden');
-    return;
-  }
-
-  // Build a long repeating ticker string (duplicated for seamless loop)
-  const segment = `⚠️  AQI ${aqi} — ${level.toUpperCase()}  •  ${advice}  •  Visit alerts.html to configure notifications      `;
-  const fullText = segment + segment; // duplicate for seamless scroll
-  textEl.textContent = fullText;
-
-  banner.style.setProperty('--alert-color', statusObj.color);
-  banner.style.borderLeftColor = statusObj.color;
-  banner.classList.remove('hidden');
+  if (aqi <= 100) return 'Sensitive groups limit outdoor activity.';
+  if (aqi <= 150) return 'Unhealthy for sensitive groups — keep windows closed.';
+  if (aqi <= 200) return 'Unhealthy air — wear mask outdoors.';
+  if (aqi <= 300) return 'Very unhealthy — avoid outdoor activities.';
+  return 'HAZARDOUS — stay indoors, wear N95 mask.';
 }
 
 function getAirLevelName(aqi) {
@@ -97,6 +91,102 @@ function getAirLevelName(aqi) {
   if (aqi <= 300) return 'Very Unhealthy';
   return 'Hazardous';
 }
+
+/* Cached weather state */
+let _cityWeather = null;
+let _weatherFetchedAt = 0;
+const WEATHER_TTL = 10 * 60 * 1000; // 10-min refresh
+
+async function fetchCityWeather() {
+  const lat = parseFloat(localStorage.getItem('user_lat'));
+  const lon = parseFloat(localStorage.getItem('user_lon'));
+  if (isNaN(lat) || isNaN(lon)) return;
+  if (Date.now() - _weatherFetchedAt < WEATHER_TTL && _cityWeather) return;
+  try {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+      `&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,uv_index` +
+      `&wind_speed_unit=kmh&timezone=auto`;
+    const r = await fetch(url, { signal: AbortSignal.timeout(5000) });
+    if (!r.ok) return;
+    const d = await r.json();
+    const c = d.current;
+    const code = c.weather_code ?? 0;
+    _cityWeather = {
+      temp: (c.temperature_2m ?? '--').toString().split('.')[0] + '.' + (c.temperature_2m?.toFixed(1).split('.')[1] ?? '0'),
+      feelsLike: c.apparent_temperature?.toFixed(1) ?? '--',
+      humidity: c.relative_humidity_2m ?? '--',
+      wind: c.wind_speed_10m?.toFixed(0) ?? '--',
+      uvIndex: c.uv_index?.toFixed(1) ?? '--',
+      condition: WMO_CODES[code] ?? 'Unknown',
+      icon: WMO_EMOJI[code] ?? '🌡️',
+    };
+    _weatherFetchedAt = Date.now();
+    rebuildTicker();
+  } catch (_) { }
+}
+
+/* Build + show the ticker */
+let _tickerAqi = null;
+let _tickerStatus = null;
+
+function rebuildTicker() {
+  const banner = document.getElementById('alertBanner');
+  const textEl = document.getElementById('alertText');
+  if (!banner || !textEl) return;
+
+  const city = localStorage.getItem('user_location') || 'ENVCORE Station';
+  const w = _cityWeather;
+  const aqi = _tickerAqi;
+
+  const parts = ['\u00a0\u00a0\u00a0\u00a0'];
+
+  // City name
+  parts.push(`📍 ${city.split(',')[0].trim()}`);
+
+  // Weather block
+  if (w) {
+    parts.push(
+      `${w.icon} ${w.condition}`,
+      `🌡️ Temp: ${w.temp}°C  (Feels ${w.feelsLike}°C)`,
+      `💧 Humidity: ${w.humidity}%`,
+      `🌬️ Wind: ${w.wind} km/h`,
+      `☀️ UV: ${w.uvIndex}`,
+    );
+  }
+
+  // Sensor AQI block
+  if (aqi !== null) {
+    const level = getAirLevelName(aqi);
+    const advice = getHealthAdvice(aqi);
+    parts.push(`📡 Sensor AQI: ${aqi} — ${level}`);
+    if (advice) parts.push(`⚠️ ${advice}`);
+  }
+
+  const sep = '        •        ';
+  const seg = parts.join(sep) + '                    ';
+  textEl.textContent = seg + seg; // duplicate for seamless loop
+
+  const color = (_tickerStatus?.color) ?? '#00e5ff';
+  banner.style.setProperty('--alert-color', color);
+  banner.style.borderLeftColor = color;
+  banner.classList.remove('hidden'); // always visible
+}
+
+/* Called from fetchLatest every second */
+function updateTicker(aqi, statusObj) {
+  _tickerAqi = aqi;
+  _tickerStatus = statusObj;
+  rebuildTicker();
+  fetchCityWeather(); // async, uses cache
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(fetchCityWeather, 600);
+  window.addEventListener('locationUpdated', () => {
+    _cityWeather = null; _weatherFetchedAt = 0;
+    setTimeout(fetchCityWeather, 400);
+  });
+});
 
 /* ================================================================
    CHART SETUP
@@ -201,8 +291,8 @@ async function fetchLatest() {
     if (airStatusEl) airStatusEl.textContent = status.text;
     if (airCard) airCard.style.boxShadow = `0 0 30px ${status.color}`;  /* data-driven, must stay in JS */
 
-    /* ── Alert banner (news ticker) ── */
-    showAlertBanner(aqi, status);
+    /* ── News ticker: city weather + sensor AQI ── */
+    updateTicker(aqi, status);
 
     if (tempGaugeValue) tempGaugeValue.textContent = temp.toFixed(1) + " °C";
     if (airGaugeValue) airGaugeValue.textContent = aqi;

@@ -599,9 +599,10 @@ h1 {
 .card-label-tag {
   font-family: 'Orbitron', monospace;
   font-size: 8px;
-  letter-spacing: 3px;
+  letter-spacing: 2px;
   color: var(--text-dim);
   margin-bottom: 4px;
+  white-space: nowrap;
 }
 
 .card-value {
@@ -632,8 +633,9 @@ h1 {
 .air-status-badge {
   font-size: 13px;
   font-weight: 600;
-  letter-spacing: 1px;
+  letter-spacing: 0.5px;
   margin-top: 4px;
+  white-space: nowrap;
 }
 
 /* Sparkline */
