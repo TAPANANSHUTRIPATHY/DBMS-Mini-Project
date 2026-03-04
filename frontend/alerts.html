@@ -129,7 +129,7 @@
             <div class="al-card">
                 <div class="al-card-header">
                     <span class="al-card-icon">📱</span>
-                    <div class="al-card-title">SMS Alerts (Fast2SMS — India)</div>
+                    <div class="al-card-title">SMS Alerts (via Email Gateway)</div>
                 </div>
                 <div class="al-field-group">
                     <label class="al-label">Send SMS to this number</label>
@@ -176,47 +176,7 @@
                 </div>
             </div>
 
-            <!-- API SETUP GUIDE -->
-            <div class="al-card al-card-setup">
-                <div class="al-card-header">
-                    <span class="al-card-icon">🔑</span>
-                    <div class="al-card-title">API Key Setup</div>
-                    <span class="al-required-tag">Required once</span>
-                </div>
 
-                <div class="setup-section">
-                    <div class="setup-title">📧 EmailJS (Free — 200 emails/month)</div>
-                    <ol class="setup-steps">
-                        <li>Sign up at <a href="https://www.emailjs.com" target="_blank" class="al-link">emailjs.com</a>
-                        </li>
-                        <li>Add an Email Service → connect Gmail/Outlook</li>
-                        <li>Create Email Template — use variables:<br>
-                            <code>{{to_email}}</code> <code>{{subject}}</code> <code>{{message}}</code>
-                            <code>{{from_name}}</code>
-                        </li>
-                        <li>Copy Service ID, Template ID, Public Key</li>
-                        <li>Open <code>alerts-page.js</code> and paste below the <strong>▼ PASTE HERE</strong> comment
-                        </li>
-                    </ol>
-                    <div class="setup-code">
-                        const EMAILJS_SERVICE_ID = 'service_xxxxx';
-                        const EMAILJS_TEMPLATE_ID = 'template_xxxxx';
-                        const EMAILJS_PUBLIC_KEY = 'your_public_key';</div>
-                </div>
-
-                <div class="setup-divider"></div>
-
-                <div class="setup-section">
-                    <div class="setup-title">📱 Fast2SMS (Free ₹50 credit, India)</div>
-                    <ol class="setup-steps">
-                        <li>Sign up at <a href="https://www.fast2sms.com" target="_blank"
-                                class="al-link">fast2sms.com</a></li>
-                        <li>Go to <strong>Dev API</strong> → copy your Authorization key</li>
-                        <li>Open <code>alerts-page.js</code> and paste:</li>
-                    </ol>
-                    <div class="setup-code">const FAST2SMS_API_KEY = 'your_key_here';</div>
-                </div>
-            </div>
 
         </div>
 

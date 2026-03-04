@@ -10,16 +10,14 @@
         {{to_email}}, {{subject}}, {{message}}, {{from_name}})
      3. Copy Service ID, Template ID, Public Key → paste below
 
-   Fast2SMS (Indian numbers):
-     1. Sign up free → https://www.fast2sms.com (₹50 free credit)
-     2. Dev API → copy Authorization key → paste below
+   Textbelt SMS (Free 1 SMS/day):
+     1. Simply use 'textbelt' as the key for 1 free daily SMS without signup.
+     2. Open alerts-page.js and paste:
    ══════════════════════════════════════════════════════════════ */
 
-/* ▼▼▼ PASTE YOUR KEYS HERE ▼▼▼ */
 const EMAILJS_SERVICE_ID = 'service_yx0ey3b';   // e.g. 'service_abc123'
 const EMAILJS_TEMPLATE_ID = 'template_y1l9mmt';  // e.g. 'template_xyz789'
 const EMAILJS_PUBLIC_KEY = 'ECftLHDahALaBy8jt';    // e.g. 'AbCdEfGhIj...'
-const FAST2SMS_API_KEY = 'f3gcPA8RnUvowkFLiVduL5PTU8tuUsYvh5Y2PDsRLKUkwQznUSEuyt0IxqzV';  // e.g. 'aBcDeFgHiJ...'
 /* ▲▲▲ KEYS END ▲▲▲ */
 
 /* ── Constants ── */
@@ -166,34 +164,36 @@ async function sendEmail(aqi, threshold, level, isTest = false) {
    SEND SMS
 ================================================================ */
 async function sendSMS(aqi, threshold, level, isTest = false) {
-    if (FAST2SMS_API_KEY === 'YOUR_FAST2SMS_KEY') {
-        toast('⚠️ Fast2SMS key not set in alerts-page.js', '#ffcc00');
-        setStatus('smsStatus', '⚠️ Key missing', '#ffcc00');
+    if (EMAILJS_SERVICE_ID === 'service_xxxxx') {
+        toast('⚠️ EmailJS keys not configured yet.', '#ffcc00');
+        setStatus('smsStatus', '⚠️ Keys Missing', '#ffcc00');
         return;
     }
-    const phone = isTest ? (v('alertPhone') || settings.phone) : settings.phone;
-    if (!phone) { toast('⚠️ Enter a phone number first', '#ffcc00'); return; }
+
+    const phoneGateway = isTest ? (v('alertPhone') || settings.phone) : settings.phone;
+    if (!phoneGateway || !phoneGateway.includes('@')) {
+        toast('⚠️ Enter a valid SMS Gateway address (e.g. 12485551212@txt.att.net)', '#ffcc00');
+        return;
+    }
 
     const msg = buildMsg(v('smsBody') || settings.smsBody, aqi, threshold, level);
 
     try {
-        const res = await fetch('https://corsproxy.io/?https://www.fast2sms.com/dev/bulkV2', {
-            method: 'POST',
-            headers: { 'authorization': FAST2SMS_API_KEY, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ route: 'q', message: msg, language: 'english', flash: 0, numbers: phone }),
-        });
-        const data = await res.json();
-        if (data.return) {
-            toast('📱 SMS sent to ' + phone, '#00e5ff');
-            setStatus('smsStatus', '✅ Sent!', '#00ff88');
-            setTimeout(() => setStatus('smsStatus', '', ''), 3000);
-        } else {
-            toast('❌ SMS failed: ' + (data.message?.[0] || JSON.stringify(data)), '#ff4d4d');
-            setStatus('smsStatus', '❌ Failed', '#ff4d4d');
-        }
+        await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+            to_email: phoneGateway,
+            subject: 'ENVCORE ALERT',
+            message: msg,
+            from_name: 'ENVCORE System',
+            reply_to: 'no-reply@envcore.local',
+        }, EMAILJS_PUBLIC_KEY);
+
+        toast('📱 SMS dispatched via Gateway to ' + phoneGateway.split('@')[0], '#00e5ff');
+        setStatus('smsStatus', '✅ Sent!', '#00ff88');
+        setTimeout(() => setStatus('smsStatus', '', ''), 3000);
     } catch (err) {
-        toast('❌ SMS error: ' + err.message, '#ff4d4d');
-        setStatus('smsStatus', '❌ Error', '#ff4d4d');
+        console.error(err);
+        toast('❌ SMS Gateway failed: ' + (err?.text || err), '#ff4d4d');
+        setStatus('smsStatus', '❌ Failed', '#ff4d4d');
     }
 }
 
