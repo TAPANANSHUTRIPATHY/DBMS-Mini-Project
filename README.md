@@ -195,25 +195,6 @@ DBMS-Mini-Project/
 
 ---
 
-## 🌿 Branch Structure
-
-The project follows a structured **phase-based branching strategy**, with each branch representing a traceable development milestone:
-
-| Branch | Last Updated | PR | Description |
-|--------|-------------|-----|-------------|
-| `phase-8-netlify-frontend-integration` | 20 hours ago | #5 | Final Netlify deployment + frontend polish |
-| `phase-7-render-backend-integration` | Yesterday | — | Render cloud backend deployment |
-| `phase-6-cloud-integration-and-deployment` | Yesterday | — | Full cloud stack integration |
-| `phase-5-final-ui-update` | Yesterday | #4 | Final UI improvements and refinements |
-| `phase-4-backend-integration` | 2 days ago | #2 | Production backend setup and integration |
-| `phase-3-UI-Part2` | 2 days ago | — | Frontend UI Part 2 development |
-| `phase-2-UI-Update` | 2 days ago | — | Frontend UI initial update |
-| `phase-1-backend-test` | 2 days ago | — | Backend test and database validation |
-
-> **Branching convention:** Each branch maps 1:1 to a project phase, making the full development history traceable and reviewable via GitHub pull requests.
-
----
-
 ## 🏗️ Development Phases
 
 ### 🟢 Phase 1 — Hardware + Backend Test Environment
