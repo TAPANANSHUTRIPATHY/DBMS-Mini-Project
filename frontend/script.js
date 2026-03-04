@@ -55,12 +55,72 @@ function showOffline() {
   if (status) status.textContent = 'Offline';
 }
 
+/* ── Health advice per AQI level ── */
+function getHealthAdvice(aqi) {
+  if (aqi <= 50) return null;
+  if (aqi <= 100) return 'Sensitive groups should limit prolonged outdoor activity.';
+  if (aqi <= 150) return 'Unhealthy for sensitive groups — reduce outdoor activities, keep windows closed.';
+  if (aqi <= 200) return 'Unhealthy air — close windows, wear mask outdoors.';
+  if (aqi <= 300) return 'Very unhealthy — avoid outdoor activities, use air purifier indoors.';
+  return 'HAZARDOUS — stay indoors, seal windows, wear N95 mask if going out.';
+}
+
+/* ── Update the news-ticker alert banner ── */
+function showAlertBanner(aqi, statusObj) {
+  const banner = document.getElementById('alertBanner');
+  const textEl = document.getElementById('alertText');
+  if (!banner || !textEl) return;
+
+  const level = getAirLevelName(aqi);
+  const advice = getHealthAdvice(aqi);
+
+  if (!advice) {
+    banner.classList.add('hidden');
+    return;
+  }
+
+  // Build a long repeating ticker string (duplicated for seamless loop)
+  const segment = `⚠️  AQI ${aqi} — ${level.toUpperCase()}  •  ${advice}  •  Visit alerts.html to configure notifications      `;
+  const fullText = segment + segment; // duplicate for seamless scroll
+  textEl.textContent = fullText;
+
+  banner.style.setProperty('--alert-color', statusObj.color);
+  banner.style.borderLeftColor = statusObj.color;
+  banner.classList.remove('hidden');
+}
+
+function getAirLevelName(aqi) {
+  if (aqi <= 50) return 'Good';
+  if (aqi <= 100) return 'Moderate';
+  if (aqi <= 150) return 'Unhealthy for Sensitive';
+  if (aqi <= 200) return 'Unhealthy';
+  if (aqi <= 300) return 'Very Unhealthy';
+  return 'Hazardous';
+}
+
 /* ================================================================
    CHART SETUP
 ================================================================ */
 const FONT = "Rajdhani";
 const TICK = "rgba(200,232,255,0.72)";
 const GRID = "rgba(255,255,255,0.06)";
+
+/* ── Device Status: 40-second offline detection ── */
+let lastDataTime = 0;  // epoch ms of last successful data point
+
+function checkDeviceTimeout() {
+  if (!lastDataTime) return; // not received any data yet
+  const elapsed = Date.now() - lastDataTime;
+  const OFFLINE_AFTER = 40 * 1000; // 40 seconds
+  if (elapsed > OFFLINE_AFTER) {
+    const dot = document.getElementById('dspDot');
+    const status = document.getElementById('dspStatus');
+    if (dot) { dot.style.background = '#ff4d4d'; dot.style.boxShadow = '0 0 8px #ff4d4d'; }
+    if (status) { status.textContent = 'Offline'; status.style.color = '#ff4d4d'; }
+  }
+}
+
+setInterval(checkDeviceTimeout, 5000); // check every 5 s
 
 let tempChart = null;
 let airChart = null;
@@ -141,25 +201,39 @@ async function fetchLatest() {
     if (airStatusEl) airStatusEl.textContent = status.text;
     if (airCard) airCard.style.boxShadow = `0 0 30px ${status.color}`;  /* data-driven, must stay in JS */
 
+    /* ── Alert banner (news ticker) ── */
+    showAlertBanner(aqi, status);
+
     if (tempGaugeValue) tempGaugeValue.textContent = temp.toFixed(1) + " °C";
     if (airGaugeValue) airGaugeValue.textContent = aqi;
 
     window.ENVDATA.latest = d;
     window.ENVDATA.backendOnline = true;
 
-    /* ── Device Status Panel — Online ── */
+    /* ── Device Status Panel — check ESP data freshness ── */
     const dot = document.getElementById('dspDot');
     const dspStatus = document.getElementById('dspStatus');
     const dspLastData = document.getElementById('dspLastData');
-    if (dot) { dot.style.background = '#00ff88'; dot.style.boxShadow = '0 0 10px #00ff88'; }
-    if (dspStatus) dspStatus.textContent = 'Online';
-    if (dspLastData && d.created_at) {
-      const dt = new Date(d.created_at);
-      dspLastData.textContent = dt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+    const dataAgeMs = d.created_at ? Date.now() - new Date(d.created_at).getTime() : Infinity;
+    const DEVICE_STALE_MS = 40 * 1000; // 40 seconds
+
+    if (dataAgeMs <= DEVICE_STALE_MS) {
+      // Fresh data — ESP is Online
+      lastDataTime = Date.now();
+      if (dot) { dot.style.background = '#00ff88'; dot.style.boxShadow = '0 0 10px #00ff88'; }
+      if (dspStatus) { dspStatus.textContent = 'Online'; dspStatus.style.color = '#00ff88'; }
+      if (dspLastData && d.created_at) {
+        dspLastData.textContent = new Date(d.created_at)
+          .toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      }
+    } else {
+      // Stale data — ESP is Offline (backend alive but no new readings)
+      if (dot) { dot.style.background = '#ff4d4d'; dot.style.boxShadow = '0 0 8px #ff4d4d'; }
+      if (dspStatus) { dspStatus.textContent = 'Offline'; dspStatus.style.color = '#ff4d4d'; }
     }
 
-    /* ── Fire alert check ── */
-    window.checkAlerts?.(aqi);
+    /* ── Alerts managed on alerts.html ── */
 
     const ts = d.created_at || new Date().toISOString();
     const label = new Date(ts).toLocaleTimeString("en-GB");
