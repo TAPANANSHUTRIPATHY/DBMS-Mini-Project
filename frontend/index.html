@@ -12,6 +12,7 @@
     href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Rajdhani:wght@300;400;500;600&display=swap"
     rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
 </head>
 
 <body>
@@ -51,6 +52,17 @@
 
     <div class="header-right">
       <a href="dashboard.html" class="nav-btn">&#128202; Dashboard</a>
+
+      <!-- Notification Bell -->
+      <div class="bell-wrap" id="bellBtn" title="Alert Settings">
+        <svg class="bell-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+          <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+        </svg>
+        <span class="bell-badge hidden" id="bellBadge">0</span>
+      </div>
+
       <button class="theme-btn" id="themeToggle" title="Toggle theme">
         <span class="theme-icon">&#9728;</span>
         <span class="theme-icon">&#9789;</span>
@@ -65,155 +77,284 @@
     <button class="alert-close" id="alertClose">&#10005;</button>
   </div>
 
-  <!-- HEALTH RING -->
+  <!-- ════════════════════════════════════════
+       ALERT PANEL (dropdown from bell)
+  ════════════════════════════════════════ -->
+  <div id="alertPanel" class="alert-panel">
+    <div class="ap-header">
+      <div class="ap-title">🚨 Alert System</div>
+      <button class="ap-close-x" id="alertPanelClose"
+        onclick="document.getElementById('alertPanel').classList.remove('open');panelOpen=false;">&#10005;</button>
+    </div>
+
+    <!-- Tabs -->
+    <div class="ap-tabs">
+      <button class="ap-tab active" data-tab="settings" onclick="switchAlertTab('settings',this)">⚙️ Settings</button>
+      <button class="ap-tab" data-tab="history" onclick="switchAlertTab('history',this)">📋 History</button>
+    </div>
+
+    <!-- Settings Tab -->
+    <div class="ap-tab-content" id="apTab-settings">
+
+      <!-- AQI Threshold -->
+      <div class="ap-section">
+        <div class="ap-section-title">AQI Alert Threshold</div>
+        <div class="thresh-row">
+          <button class="thresh-btn" data-val="120">120</button>
+          <button class="thresh-btn active" data-val="150">150</button>
+          <button class="thresh-btn" data-val="200">200</button>
+        </div>
+        <div class="ap-custom-row">
+          <input type="number" id="customThreshold" class="ap-input" placeholder="Custom value…" min="1" max="500">
+          <span class="ap-input-unit">AQI</span>
+        </div>
+      </div>
+
+      <!-- Email -->
+      <div class="ap-section">
+        <div class="ap-section-title-row">
+          <div class="ap-section-title">📧 Email Alerts</div>
+          <label class="ap-toggle"><input type="checkbox" id="toggleEmail" checked><span
+              class="ap-toggle-slider"></span></label>
+        </div>
+        <input type="email" id="alertEmail" class="ap-input" placeholder="Send alert to this email">
+        <div class="ap-section-title" style="margin-top:8px;font-size:9px">Email Message (edit freely)</div>
+        <textarea id="emailMsgTemplate" class="ap-textarea" rows="4"
+          placeholder="e.g. ENVCORE Alert! AQI is {aqi}, threshold {threshold}. Level: {level}. Time: {time}"></textarea>
+        <div class="ap-input-hint">Use <code>{aqi}</code> <code>{threshold}</code> <code>{level}</code>
+          <code>{time}</code></div>
+        <button class="ap-test-btn" id="testEmailBtn">📧 Send Test Email</button>
+      </div>
+
+      <!-- SMS -->
+      <div class="ap-section">
+        <div class="ap-section-title-row">
+          <div class="ap-section-title">📱 SMS Alerts</div>
+          <label class="ap-toggle"><input type="checkbox" id="toggleSms" checked><span
+              class="ap-toggle-slider"></span></label>
+        </div>
+        <input type="tel" id="alertPhone" class="ap-input" placeholder="Send SMS to this number">
+        <div class="ap-section-title" style="margin-top:8px;font-size:9px">SMS Message (edit freely)</div>
+        <textarea id="smsMsgTemplate" class="ap-textarea" rows="3"
+          placeholder="e.g. ENVCORE: AQI {aqi} exceeded {threshold}. {level}. {time}"></textarea>
+        <div class="ap-input-hint">Use <code>{aqi}</code> <code>{threshold}</code> <code>{level}</code>
+          <code>{time}</code></div>
+        <button class="ap-test-btn" id="testSmsBtn">📱 Send Test SMS</button>
+      </div>
+
+      <button class="ap-save-btn" id="alertSaveBtn">💾 Save Settings</button>
+    </div>
+
+    <!-- History Tab -->
+    <div class="ap-tab-content hidden" id="apTab-history">
+      <div class="ap-section">
+        <div class="ap-section-title-row">
+          <div class="ap-section-title">📋 Alert History</div>
+          <button class="ap-clear-btn" id="clearHistoryBtn">🗑️ Clear</button>
+        </div>
+        <div id="alertHistoryList" class="ah-list">
+          <div class="ah-empty">No alerts triggered yet</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       DEVICE STATUS PANEL
+  ════════════════════════════════════════ -->
+  <div class="device-status-panel" id="deviceStatusPanel">
+    <div class="dsp-item">
+      <span class="dsp-dot" id="dspDot"></span>
+      <span class="dsp-label">DEVICE</span>
+      <span class="dsp-val" id="dspStatus">Connecting…</span>
+    </div>
+    <div class="dsp-divider"></div>
+    <div class="dsp-item">
+      <span class="dsp-icon">⏱</span>
+      <span class="dsp-label">LAST DATA</span>
+      <span class="dsp-val" id="dspLastData">--</span>
+    </div>
+    <div class="dsp-divider"></div>
+    <div class="dsp-item">
+      <span class="dsp-icon">🔋</span>
+      <span class="dsp-label">BATTERY</span>
+      <div class="dsp-battery-wrap">
+        <div class="dsp-battery-bar">
+          <div class="dsp-battery-fill" id="dspBatFill" style="width:73%"></div>
+        </div>
+        <span class="dsp-val" id="dspBatVal">73%</span>
+      </div>
+      <span class="dsp-sim-tag">SIM</span>
+    </div>
+    <div class="dsp-divider"></div>
+    <div class="dsp-item">
+      <span class="dsp-icon">📶</span>
+      <span class="dsp-label">SIGNAL</span>
+      <div class="dsp-signal-bars" id="dspSignalBars">
+        <span class="sig-bar s1 active"></span>
+        <span class="sig-bar s2 active"></span>
+        <span class="sig-bar s3 active"></span>
+        <span class="sig-bar s4"></span>
+      </div>
+      <span class="dsp-val" id="dspSignalVal">Good</span>
+      <span class="dsp-sim-tag">SIM</span>
+    </div>
+  </div>
+
+  <!-- HEALTH RING + ALL 3 SENSOR READINGS — Centered layout -->
   <section class="health-section">
-    <div class="health-ring-wrap">
-      <canvas id="healthRing" width="220" height="220"></canvas>
-      <div class="health-center">
-        <div class="health-score-num" id="healthScore">--</div>
-        <div class="health-score-label">HEALTH SCORE</div>
-        <div class="health-score-sub" id="healthGrade">--</div>
-      </div>
-      <div class="health-ring-glow"></div>
-    </div>
-    <div class="health-legend">
-      <div class="hl-item"><span class="hl-dot temp-c"></span><span>Temperature</span><strong id="hlTemp">--</strong>
-      </div>
-      <div class="hl-item"><span class="hl-dot hum-c"></span><span>Humidity</span><strong id="hlHum">--</strong></div>
-      <div class="hl-item"><span class="hl-dot aqi-c"></span><span>Air Quality</span><strong id="hlAqi">--</strong>
-      </div>
-    </div>
-  </section>
 
-  <!-- SENSOR READINGS -->
-  <div class="section-label"><span>SENSOR READINGS</span></div>
-  <div class="cards">
-
-    <div class="card" id="tempCard">
-      <div class="card-bg-anim temp-bg"></div>
-      <div class="card-top">
-        <div class="sensor-icon-wrap">
-          <svg class="sensor-svg" viewBox="0 0 60 120">
-            <defs>
-              <linearGradient id="tg" x1="0" y1="1" x2="0" y2="0">
-                <stop offset="0%" stop-color="#ff4d4d" />
-                <stop offset="100%" stop-color="#ffaa00" />
-              </linearGradient>
-            </defs>
-            <rect x="22" y="10" width="16" height="68" rx="8" fill="none" stroke="#ff4d4d" stroke-width="1.5"
-              opacity=".7" />
-            <rect x="25" y="12" width="10" height="65" rx="5" fill="rgba(255,77,77,0.1)" />
-            <rect x="25" y="45" width="10" height="32" rx="5" fill="url(#tg)" />
-            <circle cx="30" cy="95" r="11" fill="#ff4d4d" opacity=".85" />
-            <circle cx="30" cy="95" r="6" fill="#ff8080" />
-            <line x1="38" y1="28" x2="43" y2="28" stroke="#ff4d4d" stroke-width="1.2" opacity=".6" />
-            <line x1="38" y1="43" x2="43" y2="43" stroke="#ff4d4d" stroke-width="1.2" opacity=".6" />
-            <line x1="38" y1="58" x2="43" y2="58" stroke="#ff4d4d" stroke-width="1.2" opacity=".6" />
-            <line x1="38" y1="73" x2="43" y2="73" stroke="#ff4d4d" stroke-width="1.2" opacity=".6" />
-          </svg>
-          <div class="heat-rings">
-            <div class="h-ring r1"></div>
-            <div class="h-ring r2"></div>
-            <div class="h-ring r3"></div>
-          </div>
+    <!-- Health Ring -->
+    <div class="health-ring-block">
+      <div class="health-ring-wrap">
+        <canvas id="healthRing" width="220" height="220"></canvas>
+        <div class="health-center">
+          <div class="health-score-num" id="healthScore">--</div>
+          <div class="health-score-label">HEALTH SCORE</div>
+          <div class="health-score-sub" id="healthGrade">--</div>
         </div>
-        <div>
-          <div class="card-label-tag">TEMPERATURE</div>
-          <div id="temp" class="card-value temp-val">-- &#176;C</div>
-        </div>
+        <div class="health-ring-glow"></div>
       </div>
-      <div class="card-sparkline-wrap"><canvas id="tempSparkline"></canvas></div>
-      <div class="card-bar-row">
-        <div class="card-bar">
-          <div class="bar-fill temp-bar" id="tempBar"></div>
+      <div class="health-legend">
+        <div class="hl-item"><span class="hl-dot temp-c"></span><span>Temperature</span><strong id="hlTemp">--</strong>
         </div>
-      </div>
-      <div class="card-stats">
-        <span class="stat-badge">MIN<strong id="tempMin">--</strong></span>
-        <span class="stat-badge accent-stat">AVG<strong id="tempAvg">--</strong></span>
-        <span class="stat-badge">MAX<strong id="tempMax">--</strong></span>
+        <div class="hl-item"><span class="hl-dot hum-c"></span><span>Humidity</span><strong id="hlHum">--</strong></div>
+        <div class="hl-item"><span class="hl-dot aqi-c"></span><span>Air Quality</span><strong id="hlAqi">--</strong>
+        </div>
       </div>
     </div>
 
-    <div class="card" id="humCard">
-      <div class="card-bg-anim hum-bg"></div>
-      <div class="card-top">
-        <div class="sensor-icon-wrap">
-          <svg class="sensor-svg" viewBox="0 0 80 100">
-            <defs>
-              <linearGradient id="dg" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="#00e5ff" />
-                <stop offset="100%" stop-color="#0057ff" />
-              </linearGradient>
-            </defs>
-            <path class="drop-anim" d="M40 8 Q68 48 68 64 A28 28 0 0 1 12 64 Q12 48 40 8Z" fill="url(#dg)"
-              opacity=".85" />
-            <ellipse cx="30" cy="55" rx="6" ry="11" fill="white" opacity=".2" transform="rotate(-20 30 55)" />
-            <path class="drop-mini da" d="M14 22 Q21 33 21 39 A7 7 0 0 1 7 39 Q7 33 14 22Z" fill="#00e5ff"
-              opacity=".5" />
-            <path class="drop-mini db" d="M63 14 Q70 25 70 30 A7 7 0 0 1 56 30 Q56 25 63 14Z" fill="#00e5ff"
-              opacity=".4" />
-          </svg>
-          <div class="ripple-wrap">
-            <div class="rip rp1"></div>
-            <div class="rip rp2"></div>
-          </div>
-        </div>
-        <div>
-          <div class="card-label-tag">HUMIDITY</div>
-          <div id="hum" class="card-value hum-val">-- %</div>
-        </div>
-      </div>
-      <div class="card-sparkline-wrap"><canvas id="humSparkline"></canvas></div>
-      <div class="card-bar-row">
-        <div class="card-bar">
-          <div class="bar-fill hum-bar" id="humBar"></div>
-        </div>
-      </div>
-      <div class="card-stats">
-        <span class="stat-badge">MIN<strong id="humMin">--</strong></span>
-        <span class="stat-badge accent-stat">AVG<strong id="humAvg">--</strong></span>
-        <span class="stat-badge">MAX<strong id="humMax">--</strong></span>
-      </div>
-    </div>
+    <!-- All 3 Sensor Cards -->
+    <div class="health-cards-group">
 
-    <div class="card" id="airCard">
-      <div class="card-bg-anim air-bg"></div>
-      <div class="card-top">
-        <div class="sensor-icon-wrap">
-          <div class="aqi-orb-wrap">
-            <div class="aqi-ring aq1"></div>
-            <div class="aqi-ring aq2"></div>
-            <div class="aqi-ring aq3"></div>
-            <svg class="aqi-leaf" viewBox="0 0 60 60">
-              <path d="M30 5 Q55 10 55 35 Q55 55 30 57 Q5 55 5 35 Q5 10 30 5Z" fill="none" stroke="#00ff88"
-                stroke-width="1.8" />
-              <path d="M30 57 Q30 35 46 18" fill="none" stroke="#00ff88" stroke-width="1.2" stroke-dasharray="3 3" />
+      <!-- Temperature -->
+      <div class="card health-sensor-card" id="tempCard">
+        <div class="card-bg-anim temp-bg"></div>
+        <div class="card-top">
+          <div class="sensor-icon-wrap">
+            <svg class="sensor-svg" viewBox="0 0 60 120">
+              <defs>
+                <linearGradient id="tg" x1="0" y1="1" x2="0" y2="0">
+                  <stop offset="0%" stop-color="#ff4d4d" />
+                  <stop offset="100%" stop-color="#ffaa00" />
+                </linearGradient>
+              </defs>
+              <rect x="22" y="10" width="16" height="68" rx="8" fill="none" stroke="#ff4d4d" stroke-width="1.5"
+                opacity=".7" />
+              <rect x="25" y="12" width="10" height="65" rx="5" fill="rgba(255,77,77,0.1)" />
+              <rect x="25" y="45" width="10" height="32" rx="5" fill="url(#tg)" />
+              <circle cx="30" cy="95" r="11" fill="#ff4d4d" opacity=".85" />
+              <circle cx="30" cy="95" r="6" fill="#ff8080" />
+              <line x1="38" y1="28" x2="43" y2="28" stroke="#ff4d4d" stroke-width="1.2" opacity=".6" />
+              <line x1="38" y1="43" x2="43" y2="43" stroke="#ff4d4d" stroke-width="1.2" opacity=".6" />
+              <line x1="38" y1="58" x2="43" y2="58" stroke="#ff4d4d" stroke-width="1.2" opacity=".6" />
+              <line x1="38" y1="73" x2="43" y2="73" stroke="#ff4d4d" stroke-width="1.2" opacity=".6" />
             </svg>
+            <div class="heat-rings">
+              <div class="h-ring r1"></div>
+              <div class="h-ring r2"></div>
+              <div class="h-ring r3"></div>
+            </div>
+          </div>
+          <div>
+            <div class="card-label-tag">TEMPERATURE</div>
+            <div id="temp" class="card-value temp-val">-- &#176;C</div>
           </div>
         </div>
-        <div>
-          <div class="card-label-tag">AIR QUALITY INDEX</div>
-          <div id="air" class="card-value air-val">--</div>
-          <div id="airStatus" class="air-status-badge">--</div>
+        <div class="card-sparkline-wrap"><canvas id="tempSparkline"></canvas></div>
+        <div class="card-bar-row">
+          <div class="card-bar">
+            <div class="bar-fill temp-bar" id="tempBar"></div>
+          </div>
+        </div>
+        <div class="card-stats">
+          <span class="stat-badge">MIN<strong id="tempMin">--</strong></span>
+          <span class="stat-badge accent-stat">AVG<strong id="tempAvg">--</strong></span>
+          <span class="stat-badge">MAX<strong id="tempMax">--</strong></span>
         </div>
       </div>
-      <div class="card-sparkline-wrap"><canvas id="airSparkline"></canvas></div>
-      <div class="card-bar-row">
-        <div class="card-bar">
-          <div class="bar-fill air-bar" id="airBar"></div>
+
+      <!-- Humidity -->
+      <div class="card health-sensor-card" id="humCard">
+        <div class="card-bg-anim hum-bg"></div>
+        <div class="card-top">
+          <div class="sensor-icon-wrap">
+            <svg class="sensor-svg" viewBox="0 0 80 100">
+              <defs>
+                <linearGradient id="dg" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#00e5ff" />
+                  <stop offset="100%" stop-color="#0057ff" />
+                </linearGradient>
+              </defs>
+              <path class="drop-anim" d="M40 8 Q68 48 68 64 A28 28 0 0 1 12 64 Q12 48 40 8Z" fill="url(#dg)"
+                opacity=".85" />
+              <ellipse cx="30" cy="55" rx="6" ry="11" fill="white" opacity=".2" transform="rotate(-20 30 55)" />
+              <path class="drop-mini da" d="M14 22 Q21 33 21 39 A7 7 0 0 1 7 39 Q7 33 14 22Z" fill="#00e5ff"
+                opacity=".5" />
+              <path class="drop-mini db" d="M63 14 Q70 25 70 30 A7 7 0 0 1 56 30 Q56 25 63 14Z" fill="#00e5ff"
+                opacity=".4" />
+            </svg>
+            <div class="ripple-wrap">
+              <div class="rip rp1"></div>
+              <div class="rip rp2"></div>
+            </div>
+          </div>
+          <div>
+            <div class="card-label-tag">HUMIDITY</div>
+            <div id="hum" class="card-value hum-val">-- %</div>
+          </div>
+        </div>
+        <div class="card-sparkline-wrap"><canvas id="humSparkline"></canvas></div>
+        <div class="card-bar-row">
+          <div class="card-bar">
+            <div class="bar-fill hum-bar" id="humBar"></div>
+          </div>
+        </div>
+        <div class="card-stats">
+          <span class="stat-badge">MIN<strong id="humMin">--</strong></span>
+          <span class="stat-badge accent-stat">AVG<strong id="humAvg">--</strong></span>
+          <span class="stat-badge">MAX<strong id="humMax">--</strong></span>
         </div>
       </div>
-      <div class="card-stats">
-        <span class="stat-badge">MIN<strong id="airMin">--</strong></span>
-        <span class="stat-badge accent-stat">AVG<strong id="airAvg">--</strong></span>
-        <span class="stat-badge">MAX<strong id="airMax">--</strong></span>
+
+      <!-- AQI -->
+      <div class="card health-sensor-card" id="airCard">
+        <div class="card-bg-anim air-bg"></div>
+        <div class="card-top">
+          <div class="sensor-icon-wrap">
+            <div class="aqi-orb-wrap">
+              <div class="aqi-ring aq1"></div>
+              <div class="aqi-ring aq2"></div>
+              <div class="aqi-ring aq3"></div>
+              <svg class="aqi-leaf" viewBox="0 0 60 60">
+                <path d="M30 5 Q55 10 55 35 Q55 55 30 57 Q5 55 5 35 Q5 10 30 5Z" fill="none" stroke="#00ff88"
+                  stroke-width="1.8" />
+                <path d="M30 57 Q30 35 46 18" fill="none" stroke="#00ff88" stroke-width="1.2" stroke-dasharray="3 3" />
+              </svg>
+            </div>
+          </div>
+          <div>
+            <div class="card-label-tag">AIR QUALITY INDEX</div>
+            <div id="air" class="card-value air-val">--</div>
+            <div id="airStatus" class="air-status-badge">--</div>
+          </div>
+        </div>
+        <div class="card-sparkline-wrap"><canvas id="airSparkline"></canvas></div>
+        <div class="card-bar-row">
+          <div class="card-bar">
+            <div class="bar-fill air-bar" id="airBar"></div>
+          </div>
+        </div>
+        <div class="card-stats">
+          <span class="stat-badge">MIN<strong id="airMin">--</strong></span>
+          <span class="stat-badge accent-stat">AVG<strong id="airAvg">--</strong></span>
+          <span class="stat-badge">MAX<strong id="airMax">--</strong></span>
+        </div>
       </div>
-    </div>
 
-  </div>
+    </div><!-- /.health-cards-group -->
 
-  </div>
+  </section>
 
   <!-- FULL DAY MASTER GRAPH -->
   <div class="section-label"><span>TODAY'S MASTER GRAPH (00:00 - 23:59)</span></div>
@@ -391,6 +532,18 @@
   <script src="script.js" defer></script>
   <script src="charts.js" defer></script>
   <script src="forecast.js" defer></script>
+  <script src="alerts.js" defer></script>
+  <script>
+    // Alert tab switcher
+    function switchAlertTab(tab, btn) {
+      document.querySelectorAll('.ap-tab').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.ap-tab-content').forEach(c => c.classList.add('hidden'));
+      btn.classList.add('active');
+      document.getElementById('apTab-' + tab)?.classList.remove('hidden');
+    }
+    // panelOpen must be accessible for inline close button
+    var panelOpen = false;
+  </script>
 </body>
 
 </html>

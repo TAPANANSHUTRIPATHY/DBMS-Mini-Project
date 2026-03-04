@@ -48,6 +48,11 @@ function showOffline() {
   if (airGaugeValue) airGaugeValue.textContent = "--";
   window.ENVDATA.backendOnline = false;
   window.ENVDATA.ready = false;
+  /* Device Status Panel — Offline */
+  const dot = document.getElementById('dspDot');
+  const status = document.getElementById('dspStatus');
+  if (dot) { dot.style.background = '#ff4d4d'; dot.style.boxShadow = '0 0 8px #ff4d4d'; }
+  if (status) status.textContent = 'Offline';
 }
 
 /* ================================================================
@@ -141,6 +146,20 @@ async function fetchLatest() {
 
     window.ENVDATA.latest = d;
     window.ENVDATA.backendOnline = true;
+
+    /* ── Device Status Panel — Online ── */
+    const dot = document.getElementById('dspDot');
+    const dspStatus = document.getElementById('dspStatus');
+    const dspLastData = document.getElementById('dspLastData');
+    if (dot) { dot.style.background = '#00ff88'; dot.style.boxShadow = '0 0 10px #00ff88'; }
+    if (dspStatus) dspStatus.textContent = 'Online';
+    if (dspLastData && d.created_at) {
+      const dt = new Date(d.created_at);
+      dspLastData.textContent = dt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+
+    /* ── Fire alert check ── */
+    window.checkAlerts?.(aqi);
 
     const ts = d.created_at || new Date().toISOString();
     const label = new Date(ts).toLocaleTimeString("en-GB");
