@@ -24,6 +24,8 @@ const tempEl = document.getElementById("temp");
 const humEl = document.getElementById("hum");
 const airEl = document.getElementById("air");
 const airStatusEl = document.getElementById("airStatus");
+const tempStatusEl = document.getElementById("tempStatus");
+const humStatusEl = document.getElementById("humStatus");
 const airCard = document.getElementById("airCard");
 const tempGaugeValue = document.getElementById("tempGaugeValue");
 const airGaugeValue = document.getElementById("airGaugeValue");
@@ -148,19 +150,18 @@ function rebuildTicker() {
   if (w) {
     parts.push(
       `${w.icon} ${w.condition}`,
-      `🌡️ Temp: ${w.temp}°C  (Feels ${w.feelsLike}°C)`,
+      `🌡️ Temp: ${w.temp}°C`,
       `💧 Humidity: ${w.humidity}%`,
-      `🌬️ Wind: ${w.wind} km/h`,
-      `☀️ UV: ${w.uvIndex}`,
+      `🌬️ Wind: ${w.wind} km/h`
     );
   }
 
-  // Sensor AQI block
+  // Sensor AQI block (Simplified Design)
   if (aqi !== null) {
     const level = getAirLevelName(aqi);
-    const advice = getHealthAdvice(aqi);
     parts.push(`📡 Sensor AQI: ${aqi} — ${level}`);
-    if (advice) parts.push(`⚠️ ${advice}`);
+  } else {
+    parts.push(`📡 Sensor Offline`);
   }
 
   const sep = '        •        ';
@@ -323,19 +324,37 @@ async function fetchLatest() {
       return;
     }
 
-    if (tempEl) tempEl.textContent = temp.toFixed(1) + " °C";
-    if (humEl) humEl.textContent = hum.toFixed(1) + " %";
-    if (airEl) airEl.textContent = aqi;
-
+    const isToday = (d.created_at) && (new Date(d.created_at).setHours(0, 0, 0, 0) === new Date().setHours(0, 0, 0, 0));
     const status = getAirStatus(aqi);
-    if (airStatusEl) airStatusEl.textContent = status.text;
-    if (airCard) airCard.style.boxShadow = `0 0 30px ${status.color}`;  /* data-driven, must stay in JS */
 
-    /* ── News ticker: city weather + sensor AQI ── */
-    updateTicker(aqi, status);
+    if (isToday) {
+      if (tempEl) tempEl.textContent = temp.toFixed(1) + " \u00b0C";
+      if (humEl) humEl.textContent = hum.toFixed(1) + " %";
+      if (airEl) airEl.textContent = aqi;
+      if (airStatusEl) airStatusEl.textContent = status.text;
+      if (tempStatusEl) tempStatusEl.textContent = '';
+      if (humStatusEl) humStatusEl.textContent = '';
+      if (airCard) airCard.style.boxShadow = `0 0 30px ${status.color}`;  /* data-driven, must stay in JS */
 
-    if (tempGaugeValue) tempGaugeValue.textContent = temp.toFixed(1) + " °C";
-    if (airGaugeValue) airGaugeValue.textContent = aqi;
+      /* \u2500\u2500 News ticker: city weather + sensor AQI \u2500\u2500 */
+      updateTicker(aqi, status);
+
+      if (tempGaugeValue) tempGaugeValue.textContent = temp.toFixed(1) + " \u00b0C";
+      if (airGaugeValue) airGaugeValue.textContent = aqi;
+    } else {
+      if (tempEl) tempEl.textContent = '--';
+      if (humEl) humEl.textContent = '--';
+      if (airEl) airEl.textContent = '--';
+      if (tempStatusEl) tempStatusEl.textContent = 'No Data Today';
+      if (humStatusEl) humStatusEl.textContent = 'No Data Today';
+      if (airStatusEl) airStatusEl.textContent = 'No Data Today';
+      if (airCard) airCard.style.boxShadow = `0 0 30px rgba(255,255,255,0.1)`;
+
+      updateTicker(null, null);
+
+      if (tempGaugeValue) tempGaugeValue.textContent = '--';
+      if (airGaugeValue) airGaugeValue.textContent = '--';
+    }
 
     window.ENVDATA.latest = d;
     window.ENVDATA.backendOnline = true;
@@ -345,6 +364,14 @@ async function fetchLatest() {
     const dspStatus = document.getElementById('dspStatus');
     const dspLastData = document.getElementById('dspLastData');
 
+    if (dspLastData && d.created_at) {
+      const dt = new Date(d.created_at);
+      const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      const mos = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      dspLastData.textContent = `${days[dt.getDay()]} ${dt.getDate()} ${mos[dt.getMonth()]} ` +
+        dt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+
     const dataAgeMs = d.created_at ? Date.now() - new Date(d.created_at).getTime() : Infinity;
     const DEVICE_STALE_MS = 6 * 60 * 1000; // 6 minutes
 
@@ -353,10 +380,6 @@ async function fetchLatest() {
       lastDataTime = Date.now();
       if (dot) { dot.style.background = '#00ff88'; dot.style.boxShadow = '0 0 10px #00ff88'; }
       if (dspStatus) { dspStatus.textContent = 'Online'; dspStatus.style.color = '#00ff88'; }
-      if (dspLastData && d.created_at) {
-        dspLastData.textContent = new Date(d.created_at)
-          .toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      }
       updateSignalBars('excellent');
     } else {
       // Stale data — ESP is Offline (backend alive but no new readings)
@@ -367,9 +390,11 @@ async function fetchLatest() {
 
     /* ── Alerts managed on alerts.html ── */
 
-    const ts = d.created_at || new Date().toISOString();
-    const label = new Date(ts).toLocaleTimeString("en-GB");
-    appendPoint(label, temp, hum, aqi);
+    if (isToday) {
+      const ts = d.created_at || new Date().toISOString();
+      const label = new Date(ts).toLocaleTimeString("en-GB");
+      appendPoint(label, temp, hum, aqi);
+    }
 
     const D = window.ENVDATA;
     if (tempChart && D.labels.length > 0) {
@@ -404,14 +429,17 @@ async function fetchHistory() {
       if (!Array.isArray(raw) || !raw.length) continue;
 
       const slice = raw.slice(-MAX_PTS);
-      const lastTs = slice[slice.length - 1]?.created_at || "";
+      const lastTs = raw[raw.length - 1]?.created_at || "";
       if (lastTs === _historyLastTs) break;
       _historyLastTs = lastTs;
 
-      const labels = slice.map(d => new Date(d.created_at).toLocaleTimeString("en-GB"));
-      const temps = slice.map(d => parseFloat(d.temperature));
-      const hums = slice.map(d => parseFloat(d.humidity));
-      const aqis = slice.map(d => parseFloat(d.air_quality));
+      const todayMidnight = new Date().setHours(0, 0, 0, 0);
+      const todaySlice = slice.filter(p => p.created_at && new Date(p.created_at).setHours(0, 0, 0, 0) === todayMidnight);
+
+      const labels = todaySlice.map(d => new Date(d.created_at).toLocaleTimeString("en-GB"));
+      const temps = todaySlice.map(d => parseFloat(d.temperature));
+      const hums = todaySlice.map(d => parseFloat(d.humidity));
+      const aqis = todaySlice.map(d => parseFloat(d.air_quality));
 
       window.ENVDATA.labels = labels;
       window.ENVDATA.temps = temps;
@@ -542,6 +570,34 @@ document.addEventListener("DOMContentLoaded", () => {
         document.body.classList.remove('cursor-hovering');
       }
     });
+  }
+
+  /* ================================================================
+     FOOTER TICKER INIT
+  ================================================================ */
+  const footerTicker = document.getElementById('footerTickerInner');
+  if (footerTicker) {
+    const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const now = new Date();
+    const dateStr = `${DAYS[now.getDay()]}, ${now.getDate()} ${MONTHS[now.getMonth()]} ${now.getFullYear()}`;
+
+    // Build one segment
+    const segHtml = `
+      <div class="ft-segment">
+        Made with <span class="ft-heart">❤</span>
+        <span class="ft-sep"></span>
+        <span class="ft-author">Tapananshu Tripathy</span>
+        <span class="ft-sep"></span>
+        <span class="ft-date">✦ ${dateStr} ✦</span>
+        <span class="ft-sep"></span>
+        ENVCORE — Smart Environmental Monitoring
+        <span class="ft-sep"></span>
+        B.Tech CSE · KIIT University · Bhubaneswar
+      </div>
+    `;
+    // Duplicate for seamless loop
+    footerTicker.innerHTML = segHtml + segHtml;
   }
 
 });

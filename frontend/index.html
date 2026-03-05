@@ -67,11 +67,9 @@
   </header>
 
   <div id="alertBanner" class="alert-banner hidden">
-    <span class="alert-icon">&#9888;</span>
     <div class="alert-ticker-wrap">
       <span id="alertText" class="alert-ticker-text"></span>
     </div>
-    <button class="alert-close" id="alertClose">&#10005;</button>
   </div>
 
   <!-- ════════════════════════════════════════
@@ -86,7 +84,7 @@
     <div class="dsp-divider"></div>
     <div class="dsp-item">
       <span class="dsp-icon">⏱</span>
-      <span class="dsp-label">LAST DATA</span>
+      <span class="dsp-label">LAST ACTIVE</span>
       <span class="dsp-val" id="dspLastData">--</span>
     </div>
     <div class="dsp-divider"></div>
@@ -166,6 +164,7 @@
           <div>
             <div class="card-label-tag">TEMPERATURE</div>
             <div id="temp" class="card-value temp-val">-- &#176;C</div>
+            <div id="tempStatus" class="air-status-badge"></div>
           </div>
         </div>
         <div class="card-sparkline-wrap"><canvas id="tempSparkline"></canvas></div>
@@ -209,6 +208,7 @@
           <div>
             <div class="card-label-tag">HUMIDITY</div>
             <div id="hum" class="card-value hum-val">-- %</div>
+            <div id="humStatus" class="air-status-badge"></div>
           </div>
         </div>
         <div class="card-sparkline-wrap"><canvas id="humSparkline"></canvas></div>
@@ -477,6 +477,18 @@
 
   <!-- TOAST POPUP CONTAINER -->
   <div id="toastContainer"></div>
+
+  <script src="location.js" defer></script>
+  <!-- Footer Ticker -->
+  <footer class="site-footer">
+    <div class="footer-glow-line"></div>
+    <div class="footer-ticker-wrap">
+      <div class="footer-ticker-inner" id="footerTickerInner">
+        <!-- Content duplicated for seamless loop -->
+      </div>
+    </div>
+    <div class="footer-glow-line"></div>
+  </footer>
 
   <script src="location.js" defer></script>
   <script src="script.js" defer></script>

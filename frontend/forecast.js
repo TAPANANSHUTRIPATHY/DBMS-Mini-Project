@@ -289,20 +289,26 @@
 
         updateMasterBoth(masterTempSlots, masterHumSlots, masterAqiSlots);
 
-        /* ── 7-day tile charts: daily averages bucketed by day slot (null = no data) ── */
+        /* ── 7-day tile charts: daily averages bucketed by local calendar day slot (null = no data) ── */
         /* slot 0 = 6 days ago, slot 6 = today */
         const tempSums = new Array(7).fill(0);
         const humSums = new Array(7).fill(0);
         const aqiSums = new Array(7).fill(0);
         const dayCounts = new Array(7).fill(0);
 
-        const nowMs = Date.now();
+        const todayMidnight = new Date();
+        todayMidnight.setHours(0, 0, 0, 0);
+
         raw.forEach(r => {
             if (!r.created_at) return;
             const d = new Date(r.created_at);
-            const msAgo = nowMs - d.getTime();
-            const daysAgo = Math.floor(msAgo / (86400000));  /* 0 = today, 1 = yesterday … */
-            if (daysAgo > 6) return;    /* older than 7 days — skip */
+            const dMidnight = new Date(d);
+            dMidnight.setHours(0, 0, 0, 0);
+
+            const msAgo = todayMidnight.getTime() - dMidnight.getTime();
+            const daysAgo = Math.round(msAgo / 86400000);  /* 0 = today, 1 = yesterday … */
+
+            if (daysAgo < 0 || daysAgo > 6) return;    /* older than 7 days or future — skip */
             const slot = 6 - daysAgo;   /* slot 6 = today, slot 0 = 6 days ago */
             const temp = parseFloat(r.temperature);
             const hum = parseFloat(r.humidity);
@@ -312,9 +318,9 @@
             if (!isNaN(aqi)) { aqiSums[slot] += aqi; }
         });
 
-        const tempSlots = tempSums.map((s, i) => dayCounts[i] ? parseFloat((s / dayCounts[i]).toFixed(1)) : null);
-        const humSlots = humSums.map((s, i) => dayCounts[i] ? parseFloat((s / dayCounts[i]).toFixed(1)) : null);
-        const aqiSlots = aqiSums.map((s, i) => dayCounts[i] ? parseFloat((s / dayCounts[i]).toFixed(1)) : null);
+        const tempSlots = tempSums.map((s, i) => dayCounts[i] ? parseFloat((s / dayCounts[i]).toFixed(1)) : 0);
+        const humSlots = humSums.map((s, i) => dayCounts[i] ? parseFloat((s / dayCounts[i]).toFixed(1)) : 0);
+        const aqiSlots = aqiSums.map((s, i) => dayCounts[i] ? parseFloat((s / dayCounts[i]).toFixed(1)) : 0);
 
         updateTile(tempTileChart, tempSlots);
         updateTile(humTileChart, humSlots);
