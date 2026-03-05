@@ -373,7 +373,7 @@ async function fetchLatest() {
     }
 
     const dataAgeMs = d.created_at ? Date.now() - new Date(d.created_at).getTime() : Infinity;
-    const DEVICE_STALE_MS = 6 * 60 * 1000; // 6 minutes
+    const DEVICE_STALE_MS = 10 * 60 * 1000; // 10 minutes
 
     if (dataAgeMs <= DEVICE_STALE_MS) {
       // Fresh data — ESP is Online
