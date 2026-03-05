@@ -90,9 +90,17 @@ let _weatherFetchedAt = 0;
 const WEATHER_TTL = 10 * 60 * 1000; // 10-min refresh
 
 async function fetchCityWeather() {
-  const lat = parseFloat(localStorage.getItem('user_lat'));
-  const lon = parseFloat(localStorage.getItem('user_lon'));
-  if (isNaN(lat) || isNaN(lon)) return;
+  // If no user location is set, default to KIIT Bhubaneswar
+  let lat = parseFloat(localStorage.getItem('user_lat'));
+  let lon = parseFloat(localStorage.getItem('user_lon'));
+  if (isNaN(lat) || isNaN(lon)) {
+    lat = 20.3546;
+    lon = 85.8164;
+    localStorage.setItem('user_lat', lat);
+    localStorage.setItem('user_lon', lon);
+    localStorage.setItem('user_location', 'Bhubaneswar, Odisha, India');
+  }
+
   if (Date.now() - _weatherFetchedAt < WEATHER_TTL && _cityWeather) return;
   try {
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
@@ -112,6 +120,7 @@ async function fetchCityWeather() {
       condition: WMO_CODES[code] ?? 'Unknown',
       icon: WMO_EMOJI[code] ?? '🌡️',
     };
+    window.cityWeatherContext = _cityWeather;
     _weatherFetchedAt = Date.now();
     rebuildTicker();
   } catch (_) { }
@@ -191,10 +200,42 @@ const TICK = "rgba(200,232,255,0.72)";
 const GRID = "rgba(255,255,255,0.06)";
 
 /* ── Device Status: 40-second offline detection ── */
+function updateSignalBars(state) {
+  const barsContainer = document.getElementById('dspSignalBars');
+  const valEl = document.getElementById('dspSignalVal');
+  if (!barsContainer || !valEl) return;
+
+  barsContainer.className = 'dsp-signal-bars'; // reset classes
+  const bars = barsContainer.querySelectorAll('.sig-bar');
+  bars.forEach(b => b.classList.remove('active'));
+
+  if (state === 'bad') {
+    barsContainer.classList.add('sig-bad');
+    if (bars[0]) bars[0].classList.add('active');
+    valEl.textContent = 'Bad';
+    valEl.style.color = '#ff4d4d';
+  } else if (state === 'good') {
+    barsContainer.classList.add('sig-good');
+    if (bars[0]) bars[0].classList.add('active');
+    if (bars[1]) bars[1].classList.add('active');
+    if (bars[2]) bars[2].classList.add('active');
+    valEl.textContent = 'Good';
+    valEl.style.color = '#ffcc00';
+  } else if (state === 'excellent') {
+    barsContainer.classList.add('sig-excellent');
+    bars.forEach(b => b.classList.add('active'));
+    valEl.textContent = 'Excellent';
+    valEl.style.color = '#00ff88';
+  }
+}
+
 let lastDataTime = 0;  // epoch ms of last successful data point
 
 function checkDeviceTimeout() {
-  if (!lastDataTime) return; // not received any data yet
+  if (!lastDataTime) {
+    updateSignalBars('bad');
+    return;
+  }
   const elapsed = Date.now() - lastDataTime;
   const OFFLINE_AFTER = 6 * 60 * 1000; // 6 minutes
   if (elapsed > OFFLINE_AFTER) {
@@ -202,6 +243,7 @@ function checkDeviceTimeout() {
     const status = document.getElementById('dspStatus');
     if (dot) { dot.style.background = '#ff4d4d'; dot.style.boxShadow = '0 0 8px #ff4d4d'; }
     if (status) { status.textContent = 'Offline'; status.style.color = '#ff4d4d'; }
+    updateSignalBars('bad');
   }
 }
 
@@ -269,14 +311,17 @@ let _latestTs = "";
 async function fetchLatest() {
   try {
     const res = await fetch(`${API_URL}/latest`, { signal: AbortSignal.timeout(3000) });
-    if (!res.ok) { showOffline(); return; }
+    if (!res.ok) { showOffline(); updateSignalBars('bad'); return; }
     const d = await res.json();
-    if (!d) { showOffline(); return; }
+    if (!d) { showOffline(); updateSignalBars('bad'); return; }
 
     const temp = parseFloat(d.temperature);
     const hum = parseFloat(d.humidity);
     const aqi = parseFloat(d.air_quality);
-    if (isNaN(temp) || isNaN(hum) || isNaN(aqi)) { showOffline(); return; }
+    if (isNaN(temp) || isNaN(hum) || isNaN(aqi)) {
+      updateSignalBars('good'); // Data is coming, but might be malformed/partial
+      return;
+    }
 
     if (tempEl) tempEl.textContent = temp.toFixed(1) + " °C";
     if (humEl) humEl.textContent = hum.toFixed(1) + " %";
@@ -312,10 +357,12 @@ async function fetchLatest() {
         dspLastData.textContent = new Date(d.created_at)
           .toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
       }
+      updateSignalBars('excellent');
     } else {
       // Stale data — ESP is Offline (backend alive but no new readings)
       if (dot) { dot.style.background = '#ff4d4d'; dot.style.boxShadow = '0 0 8px #ff4d4d'; }
       if (dspStatus) { dspStatus.textContent = 'Offline'; dspStatus.style.color = '#ff4d4d'; }
+      updateSignalBars('bad');
     }
 
     /* ── Alerts managed on alerts.html ── */
@@ -451,6 +498,51 @@ document.addEventListener("DOMContentLoaded", () => {
       document.querySelectorAll(".modal.is-open").forEach(m => window.closeModal(m.id));
     }
   });
+
+  /* ================================================================
+     CUSTOM GLOWING CURSOR LOGIC
+  ================================================================ */
+  const cursor = document.getElementById('customCursor');
+  const cursorRing = document.getElementById('customCursorRing');
+
+  if (cursor && cursorRing) {
+    // Hide default cursor over the entire document just in case
+    document.documentElement.style.cursor = 'none';
+
+    // Track mouse position
+    document.addEventListener('mousemove', (e) => {
+      // Use requestAnimationFrame for smoother performance
+      requestAnimationFrame(() => {
+        cursor.style.left = `${e.clientX}px`;
+        cursor.style.top = `${e.clientY}px`;
+
+        // Add a slight delay/easing to the ring for a "following" effect
+        // A simple approach is just locking it to the mouse with transition in CSS
+        cursorRing.style.left = `${e.clientX}px`;
+        cursorRing.style.top = `${e.clientY}px`;
+      });
+    });
+
+    // Handle clicking animation
+    document.addEventListener('mousedown', () => document.body.classList.add('cursor-clicking'));
+    document.addEventListener('mouseup', () => document.body.classList.remove('cursor-clicking'));
+
+    // Handle hovering over interactive elements
+    const interactiveSelectors = 'a, button, input, .clickable, .close[data-modal], .loc-dd-item';
+
+    // We use event delegation on body for dynamically added elements (like dropdowns)
+    document.body.addEventListener('mouseover', (e) => {
+      if (e.target.closest(interactiveSelectors)) {
+        document.body.classList.add('cursor-hovering');
+      }
+    });
+
+    document.body.addEventListener('mouseout', (e) => {
+      if (e.target.closest(interactiveSelectors)) {
+        document.body.classList.remove('cursor-hovering');
+      }
+    });
+  }
 
 });
 

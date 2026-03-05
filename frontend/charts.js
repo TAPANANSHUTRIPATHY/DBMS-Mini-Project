@@ -436,6 +436,36 @@
       const s = newSym(); s.y = Math.random() * H; s.life = Math.random() * s.maxLife; return s;
     });
 
+    /* ── Stunning Weather Elements ── */
+    // Multi-layer rain for parallax effect
+    const RAIN_DROPS = Array.from({ length: 250 }, () => {
+      const z = Math.random() * 3 + 1; // 1 to 4 depth
+      return {
+        x: Math.random() * 1920,
+        y: Math.random() * 1080,
+        z: z,
+        len: Math.random() * 15 * z + 10,
+        vy: (Math.random() * 5 + 10) * z,
+        vx: (Math.random() - 0.5) * z * 1.5,
+        a: Math.random() * 0.2 + 0.1 * z
+      };
+    });
+
+    // Smooth, deep clouds
+    const CLOUDS = Array.from({ length: 8 }, () => {
+      const scale = Math.random() * 1.5 + 0.5;
+      return {
+        x: Math.random() * 1920,
+        y: Math.random() * Math.max(H * 0.4, 300) - 50,
+        size: 70 * scale,
+        vx: (Math.random() * 0.3 + 0.1) * scale,
+        a: Math.random() * 0.2 + 0.05
+      };
+    });
+
+    let sunRotation = 0;
+    let lightningFlash = 0;
+
     function drawDrop(x, y, sz, a, hue) { bx.save(); bx.translate(x, y); bx.globalAlpha = a; bx.strokeStyle = `hsl(${hue},90%,65%)`; bx.lineWidth = .9; bx.shadowColor = `hsl(${hue},90%,65%)`; bx.shadowBlur = 7; bx.beginPath(); bx.moveTo(0, -sz); bx.bezierCurveTo(sz * .85, -sz * .15, sz * .85, sz * .5, 0, sz * .82); bx.bezierCurveTo(-sz * .85, sz * .5, -sz * .85, -sz * .15, 0, -sz); bx.stroke(); bx.restore(); }
     function drawTherm(x, y, sz, a) { bx.save(); bx.translate(x, y); bx.globalAlpha = a; bx.strokeStyle = `rgba(255,110,80,${a})`; bx.lineWidth = 1.1; bx.shadowColor = "#ff4d4d"; bx.shadowBlur = 6; bx.beginPath(); bx.moveTo(-sz * .17, -sz); bx.lineTo(sz * .17, -sz); bx.lineTo(sz * .17, sz * .35); bx.lineTo(-sz * .17, sz * .35); bx.closePath(); bx.stroke(); bx.beginPath(); bx.arc(0, sz * .5, sz * .3, 0, 6.28); bx.fillStyle = `rgba(255,77,77,${a * .55})`; bx.fill(); bx.restore(); }
     function drawRing(x, y, sz, a, hue) { bx.save(); bx.translate(x, y); bx.globalAlpha = a; bx.strokeStyle = `hsl(${hue},90%,60%)`; bx.lineWidth = .8; bx.shadowColor = `hsl(${hue},90%,60%)`; bx.shadowBlur = 9; bx.beginPath(); bx.arc(0, 0, sz, 0, 6.28); bx.stroke(); bx.globalAlpha = a * .4; bx.beginPath(); bx.arc(0, 0, sz * .5, 0, 6.28); bx.stroke(); for (let i = 0; i < 6; i++) { const ang = i / 6 * 6.28; bx.globalAlpha = a * .6; bx.beginPath(); bx.arc(Math.cos(ang) * sz, Math.sin(ang) * sz, sz * .1, 0, 6.28); bx.fillStyle = `hsl(${hue},90%,70%)`; bx.fill(); } bx.restore(); }
@@ -456,10 +486,189 @@
       bx.restore();
     }
 
+    function drawWeather(condStr, lightMode) {
+      if (!condStr) return;
+      condStr = condStr.toLowerCase();
+
+      const isRainy = condStr.includes('rain') || condStr.includes('drizzle') || condStr.includes('shower');
+      const isClear = condStr.includes('clear') || condStr.includes('sun');
+      const isCloudy = condStr.includes('cloud') || condStr.includes('overcast') || isRainy;
+      const isStormy = condStr.includes('thunder') || condStr.includes('storm');
+
+      // Time-based Day/Night cycle
+      const hour = new Date().getHours();
+      const isNight = hour >= 18 || hour < 6; // Night from 6 PM to 6 AM (can be improved with sun events later)
+      const isSunny = isClear && !isNight;
+      const isMoonlit = isClear && isNight;
+
+      // 1) Lightning Flash Background (Bottom Layer of Weather)
+      if (isStormy && Math.random() < 0.005) lightningFlash = 1;
+      if (lightningFlash > 0) {
+        bx.save();
+        bx.fillStyle = `rgba(255, 255, 255, ${lightningFlash * 0.3})`;
+        bx.fillRect(0, 0, W, H);
+        bx.restore();
+        lightningFlash -= 0.05;
+      }
+
+      // 2a) The Astonishing Sun (Daytime Clear)
+      if (isSunny) {
+        bx.save();
+        const sunX = W * 0.85;
+        const sunY = H * 0.25;
+
+        sunRotation += 0.0015;
+        bx.translate(sunX, sunY);
+        bx.rotate(sunRotation);
+
+        // Intense Sun Glow
+        const glow = bx.createRadialGradient(0, 0, 30, 0, 0, 300);
+        if (lightMode) {
+          glow.addColorStop(0, 'rgba(255, 220, 50, 0.8)');
+          glow.addColorStop(0.3, 'rgba(255, 180, 0, 0.3)');
+          glow.addColorStop(1, 'transparent');
+        } else {
+          glow.addColorStop(0, 'rgba(255, 200, 0, 0.6)');
+          glow.addColorStop(0.4, 'rgba(255, 100, 0, 0.15)');
+          glow.addColorStop(1, 'transparent');
+        }
+
+        bx.beginPath();
+        bx.arc(0, 0, 300, 0, 6.28);
+        bx.fillStyle = glow;
+        bx.fill();
+
+        // Solid Core
+        bx.shadowColor = lightMode ? '#ffcc00' : '#ffaa00';
+        bx.shadowBlur = 40;
+        bx.fillStyle = lightMode ? '#ffdf00' : '#ffc400';
+        bx.beginPath();
+        bx.arc(0, 0, 45, 0, 6.28);
+        bx.fill();
+
+        // Graceful Rays
+        bx.strokeStyle = lightMode ? 'rgba(255, 200, 0, 0.6)' : 'rgba(255, 180, 0, 0.4)';
+        bx.lineWidth = 6;
+        bx.lineCap = 'round';
+        for (let i = 0; i < 12; i++) {
+          bx.rotate(6.28 / 12);
+          bx.beginPath();
+          bx.moveTo(60, 0);
+          bx.lineTo(100 + Math.sin(sunRotation * 30 + i) * 15, 0); // pulsing rays
+          bx.stroke();
+        }
+        bx.restore();
+      }
+
+      // 2b) The Glowing Moon (Nighttime Clear)
+      if (isMoonlit) {
+        bx.save();
+        const moonX = W * 0.85;
+        const moonY = H * 0.25;
+
+        bx.translate(moonX, moonY);
+
+        // Soft lunar glow
+        const moonGlow = bx.createRadialGradient(0, 0, 20, 0, 0, 250);
+        const glowColor = lightMode ? '100, 150, 255' : '200, 232, 255';
+        moonGlow.addColorStop(0, `rgba(${glowColor}, 0.5)`);
+        moonGlow.addColorStop(0.4, `rgba(${glowColor}, 0.1)`);
+        moonGlow.addColorStop(1, 'transparent');
+
+        bx.beginPath();
+        bx.arc(0, 0, 250, 0, 6.28);
+        bx.fillStyle = moonGlow;
+        bx.fill();
+
+        // Crescent Moon (drawn by clipping out an overlapping circle)
+        bx.shadowColor = `rgba(${glowColor}, 0.8)`;
+        bx.shadowBlur = 30;
+        bx.fillStyle = lightMode ? '#baddff' : '#e6f4ff';
+
+        bx.beginPath();
+        bx.arc(0, 0, 40, 0, 6.28);
+        bx.fill();
+
+        // Carve out a piece for the lunar crescent
+        bx.globalCompositeOperation = 'destination-out';
+        bx.beginPath();
+        bx.arc(-15, -10, 35, 0, 6.28);
+        bx.fill();
+
+        // Restore mode
+        bx.globalCompositeOperation = 'source-over';
+        bx.restore();
+      }
+
+      // 3) Deep Floating Clouds
+      if (isCloudy) {
+        CLOUDS.forEach(c => {
+          c.x += c.vx;
+          if (c.x > W + c.size * 2) c.x = -c.size * 3;
+
+          bx.save();
+          bx.translate(c.x, c.y);
+          bx.fillStyle = lightMode ? `rgba(220, 235, 255, ${c.a})` : `rgba(180, 220, 255, ${c.a * 0.8})`;
+          bx.shadowColor = lightMode ? "rgba(255,255,255,0.8)" : "rgba(0,0,0,0.6)";
+          bx.shadowBlur = 40;
+          bx.beginPath();
+          // Fluffy cloud shape
+          bx.arc(0, 0, c.size, 0, 6.28);
+          bx.arc(c.size * 0.8, -c.size * 0.4, c.size * 0.9, 0, 6.28);
+          bx.arc(c.size * 1.6, 0, c.size * 0.85, 0, 6.28);
+          bx.arc(c.size * 0.8, c.size * 0.3, c.size * 0.7, 0, 6.28);
+          bx.fill();
+          bx.restore();
+        });
+      }
+
+      // 4) Dynamic Parallax Rain
+      if (isRainy) {
+        bx.save();
+        // Optional storm tilt
+        if (isStormy) {
+          RAIN_DROPS.forEach(r => r.vx += 0.05); // heavy wind
+        }
+
+        bx.lineCap = 'round';
+        RAIN_DROPS.forEach(r => {
+          r.x += r.vx;
+          r.y += r.vy;
+          if (r.y > H + r.len) {
+            r.y = -50;
+            r.x = Math.random() * W;
+            if (isStormy && r.x > W) r.x = -50; // wrap wind
+          }
+          if (r.x > W + 50) r.x = -50;
+          if (r.x < -50) r.x = W + 50;
+
+          // Dynamic color based on depth
+          bx.strokeStyle = lightMode
+            ? `rgba(0, 80, 200, ${r.a})`
+            : `rgba(0, 229, 255, ${r.a})`;
+          bx.lineWidth = r.z * 1.2;
+
+          bx.beginPath();
+          bx.moveTo(r.x, r.y);
+          bx.lineTo(r.x + (r.vx * (r.len / r.vy)), r.y + r.len);
+          bx.stroke();
+        });
+        bx.restore();
+      }
+    }
+
     (function draw() {
       bx.clearRect(0, 0, W, H);
       const light = document.documentElement.getAttribute("data-theme") === "light";
+
+      // Base backgrounds
       if (!light) hexGrid();
+
+      // Weather Animations layer
+      const weatherCond = window.cityWeatherContext?.condition;
+      drawWeather(weatherCond, light);
+
+      // Particle elements (dots, symbols)
       DOTS.forEach(p => {
         p.x += p.vx; p.y += p.vy;
         if (p.x < 0) p.x = W; if (p.x > W) p.x = 0; if (p.y < 0) p.y = H; if (p.y > H) p.y = 0;

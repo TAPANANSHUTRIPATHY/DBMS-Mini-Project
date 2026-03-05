@@ -61,6 +61,8 @@
 
 html {
   scroll-behavior: smooth;
+  cursor: none;
+  /* Hide default cursor */
 }
 
 body {
@@ -70,6 +72,89 @@ body {
   min-height: 100vh;
   overflow-x: hidden;
   transition: background 0.4s ease, color 0.4s ease;
+  cursor: none;
+  /* Hide default cursor */
+}
+
+/* =====================================================
+   GLOWING CUSTOM CURSOR
+===================================================== */
+#customCursor {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 12px;
+  height: 12px;
+  background: var(--cyan);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 10000;
+  mix-blend-mode: screen;
+  box-shadow: 0 0 20px 4px var(--cyan);
+  transform: translate(-50%, -50%);
+  /* Start centered on mouse, handled in JS */
+  transition: width 0.2s, height 0.2s, background 0.2s;
+}
+
+#customCursorRing {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--cyan);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 9999;
+  mix-blend-mode: screen;
+  transform: translate(-50%, -50%);
+  /* Base transform */
+  transition: width 0.2s, height 0.2s, border-color 0.2s;
+}
+
+[data-theme="light"] #customCursor {
+  background: var(--blue);
+  box-shadow: 0 0 15px 4px var(--blue);
+  mix-blend-mode: multiply;
+}
+
+[data-theme="light"] #customCursorRing {
+  border-color: var(--blue);
+  mix-blend-mode: multiply;
+}
+
+/* Hovering effect */
+body.cursor-hovering #customCursor {
+  width: 8px;
+  height: 8px;
+  background: var(--green);
+  box-shadow: 0 0 25px 5px var(--green);
+}
+
+body.cursor-hovering #customCursorRing {
+  width: 60px;
+  height: 60px;
+  border-color: var(--green);
+  border-width: 2px;
+  background: rgba(0, 255, 136, 0.05);
+}
+
+/* Clicking effect */
+body.cursor-clicking #customCursor {
+  transform: translate(-50%, -50%) scale(0.6);
+}
+
+body.cursor-clicking #customCursorRing {
+  transform: translate(-50%, -50%) scale(0.8);
+  border-width: 3px;
+}
+
+a,
+button,
+.clickable,
+input,
+.close[data-modal] {
+  cursor: none !important;
 }
 
 /* ---- Particle BG ---- */
@@ -127,6 +212,22 @@ header {
 
 [data-theme="light"] header {
   background: rgba(232, 244, 255, 0.85);
+}
+
+/* ── Dynamic Signal Bar Colors ── */
+.sig-excellent .active {
+  background: #00ff88;
+  box-shadow: 0 0 8px #00ff88;
+}
+
+.sig-good .active {
+  background: #ffcc00;
+  box-shadow: 0 0 8px #ffcc00;
+}
+
+.sig-bad .active {
+  background: #ff4d4d;
+  box-shadow: 0 0 8px #ff4d4d;
 }
 
 .header-left {
