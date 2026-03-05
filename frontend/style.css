@@ -424,6 +424,12 @@ h1 {
   color: rgba(200, 232, 255, 0.9);
   letter-spacing: .8px;
   overflow: hidden;
+  /* Stick just below the fixed header */
+  position: sticky;
+  top: var(--header-h, 64px);
+  z-index: 900;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .alert-banner.hidden {
@@ -2853,9 +2859,13 @@ h1 {
   border-top: none;
   border-bottom: 1px solid var(--border);
   padding: 10px 36px;
-  position: relative;
-  z-index: 3;
+  position: sticky;
+  top: calc(var(--header-h, 64px) + 39px);
+  /* header + ticker height */
+  z-index: 890;
   flex-wrap: wrap;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
 }
 
 .dsp-item {

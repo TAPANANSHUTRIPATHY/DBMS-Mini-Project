@@ -261,12 +261,19 @@ async function pollAQI() {
         if (!res.ok) throw new Error('offline');
         const d = await res.json();
         const aqi = parseFloat(d?.air_quality);
-        if (isNaN(aqi)) return;
+        const valEl = document.getElementById('liveAqi');
+        const statEl = document.getElementById('liveAqiStatus');
+
+        const isToday = d?.created_at && (new Date(d.created_at).setHours(0, 0, 0, 0) === new Date().setHours(0, 0, 0, 0));
+
+        if (isNaN(aqi) || !isToday) {
+            if (valEl) { valEl.textContent = '--'; valEl.style.color = 'var(--text-dim)'; valEl.style.textShadow = 'none'; }
+            if (statEl) { statEl.textContent = 'No Data Today'; statEl.style.color = 'var(--text-dim)'; }
+            return;
+        }
 
         const color = getLevelColor(aqi);
         const level = getLevel(aqi);
-        const valEl = document.getElementById('liveAqi');
-        const statEl = document.getElementById('liveAqiStatus');
 
         if (valEl) { valEl.textContent = aqi; valEl.style.color = color; valEl.style.textShadow = `0 0 20px ${color}60`; }
         if (statEl) { statEl.textContent = level; statEl.style.color = color; }
@@ -324,37 +331,9 @@ function initTheme() {
     });
 }
 
-/* ================================================================
-   BACKGROUND CANVAS (same particle system as main page)
-================================================================ */
-function initBg() {
-    const canvas = document.getElementById('bgCanvas');
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    let W, H, particles = [];
-    function resize() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
-    resize();
-    window.addEventListener('resize', resize);
-    for (let i = 0; i < 60; i++) particles.push({
-        x: Math.random() * 2000, y: Math.random() * 2000,
-        r: Math.random() * 1.5 + .3, vx: (Math.random() - .5) * .3, vy: (Math.random() - .5) * .3,
-        a: Math.random() * .5 + .1,
-    });
-    function draw() {
-        ctx.clearRect(0, 0, W, H);
-        particles.forEach(p => {
-            p.x += p.vx; p.y += p.vy;
-            if (p.x < 0) p.x = W; if (p.x > W) p.x = 0;
-            if (p.y < 0) p.y = H; if (p.y > H) p.y = 0;
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(0,229,255,${p.a})`;
-            ctx.fill();
-        });
-        requestAnimationFrame(draw);
-    }
-    draw();
-}
+/* Background Canvas: handled by charts.js (full weather animations) */
+function initBg() { /* no-op */ }
+
 
 /* ================================================================
    INIT
@@ -414,4 +393,34 @@ document.addEventListener('DOMContentLoaded', () => {
     // Start live AQI polling
     pollAQI();
     setInterval(pollAQI, 5000);
+
+    /* ── Footer Ticker ── */
+    const footerTicker = document.getElementById('footerTickerInner');
+    if (footerTicker) {
+        const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+        const now = new Date();
+        const dateStr = `${DAYS[now.getDay()]}, ${now.getDate()} ${MONTHS[now.getMonth()]} ${now.getFullYear()}`;
+        const seg = `<div class="ft-segment">Made with <span class="ft-heart">❤</span><span class="ft-sep"></span><span class="ft-author">Tapananshu Tripathy</span><span class="ft-sep"></span><span class="ft-date">❆ ${dateStr} ❆</span><span class="ft-sep"></span>ENVCORE — Smart Environmental Monitoring<span class="ft-sep"></span>B.Tech CSE · KIIT University · Bhubaneswar</div>`;
+        footerTicker.innerHTML = seg + seg;
+    }
+
+    /* ── Custom Cursor ── */
+    const cursor = document.getElementById('customCursor');
+    const cursorRing = document.getElementById('customCursorRing');
+    if (cursor && cursorRing) {
+        document.addEventListener('mousemove', e => {
+            requestAnimationFrame(() => {
+                cursor.style.left = `${e.clientX}px`;
+                cursor.style.top = `${e.clientY}px`;
+                cursorRing.style.left = `${e.clientX}px`;
+                cursorRing.style.top = `${e.clientY}px`;
+            });
+        });
+        document.addEventListener('mousedown', () => document.body.classList.add('cursor-clicking'));
+        document.addEventListener('mouseup', () => document.body.classList.remove('cursor-clicking'));
+        const sel = 'a, button, input, textarea, .clickable';
+        document.body.addEventListener('mouseover', e => { if (e.target.closest(sel)) document.body.classList.add('cursor-hovering'); });
+        document.body.addEventListener('mouseout', e => { if (e.target.closest(sel)) document.body.classList.remove('cursor-hovering'); });
+    }
 });
