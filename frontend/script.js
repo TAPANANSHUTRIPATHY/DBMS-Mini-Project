@@ -436,10 +436,15 @@ async function fetchHistory() {
       const todayMidnight = new Date().setHours(0, 0, 0, 0);
       const todaySlice = slice.filter(p => p.created_at && new Date(p.created_at).setHours(0, 0, 0, 0) === todayMidnight);
 
-      const labels = todaySlice.map(d => new Date(d.created_at).toLocaleTimeString("en-GB"));
-      const temps = todaySlice.map(d => parseFloat(d.temperature));
-      const hums = todaySlice.map(d => parseFloat(d.humidity));
-      const aqis = todaySlice.map(d => parseFloat(d.air_quality));
+      /* Use today's data for the real-time charts if available,
+         otherwise fall back to the last available records so sparklines
+         and health ring always show something. */
+      const useSlice = todaySlice.length > 0 ? todaySlice : slice;
+
+      const labels = useSlice.map(d => new Date(d.created_at).toLocaleTimeString("en-GB"));
+      const temps = useSlice.map(d => parseFloat(d.temperature));
+      const hums = useSlice.map(d => parseFloat(d.humidity));
+      const aqis = useSlice.map(d => parseFloat(d.air_quality));
 
       window.ENVDATA.labels = labels;
       window.ENVDATA.temps = temps;
@@ -448,9 +453,13 @@ async function fetchHistory() {
       window.ENVDATA.ready = true;
       window.ENVDATA.backendOnline = true;
 
-      if (tempChart) { tempChart.data.labels = labels; tempChart.data.datasets[0].data = temps; tempChart.update("none"); }
-      if (airChart) { airChart.data.labels = labels; airChart.data.datasets[0].data = aqis; airChart.update("none"); }
+      /* Only show real-time line charts if data is from today */
+      if (todaySlice.length > 0) {
+        if (tempChart) { tempChart.data.labels = labels; tempChart.data.datasets[0].data = temps; tempChart.update("none"); }
+        if (airChart) { airChart.data.labels = labels; airChart.data.datasets[0].data = aqis; airChart.update("none"); }
+      }
       break;
+
     } catch (_) { continue; }
   }
 }

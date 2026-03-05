@@ -375,7 +375,7 @@
     <div class="modal-content">
       <div class="modal-head">
         <h3 class="modal-title">Temperature &mdash; Full View</h3>
-        <span class="close" data-modal="tempModal">&#10005;</span>
+        <button class="close" onclick="window.closeModal('tempModal')" aria-label="Close">&times;</button>
       </div>
       <div class="modal-chart-wrap"><canvas id="tempLargeCanvas"></canvas></div>
     </div>
@@ -385,7 +385,7 @@
     <div class="modal-content">
       <div class="modal-head">
         <h3 class="modal-title">Humidity &mdash; Full View</h3>
-        <span class="close" data-modal="humModal">&#10005;</span>
+        <button class="close" onclick="window.closeModal('humModal')" aria-label="Close">&times;</button>
       </div>
       <div class="modal-chart-wrap"><canvas id="humLargeCanvas"></canvas></div>
     </div>
@@ -395,7 +395,7 @@
     <div class="modal-content">
       <div class="modal-head">
         <h3 class="modal-title">Air Quality Index &mdash; Full View</h3>
-        <span class="close" data-modal="airModal">&#10005;</span>
+        <button class="close" onclick="window.closeModal('airModal')" aria-label="Close">&times;</button>
       </div>
       <div class="modal-chart-wrap"><canvas id="airLargeCanvas"></canvas></div>
     </div>
@@ -405,7 +405,7 @@
     <div class="modal-content modal-content-wide">
       <div class="modal-head">
         <h3 class="modal-title">Full Day Sensor Master Graph &mdash; Full View</h3>
-        <span class="close" data-modal="masterModal">&#10005;</span>
+        <button class="close" onclick="window.closeModal('masterModal')" aria-label="Close">&times;</button>
       </div>
       <div class="modal-chart-wrap modal-chart-tall"><canvas id="masterLargeCanvas"></canvas></div>
     </div>
@@ -416,7 +416,7 @@
     <div class="modal-content location-modal-content">
       <div class="modal-head location-modal-head">
         <h3 class="modal-title">Configure Ideal Health Values</h3>
-        <span class="close" data-modal="healthSettingsModal">&#10005;</span>
+        <button class="close" onclick="window.closeModal('healthSettingsModal')" aria-label="Close">&times;</button>
       </div>
       <div class="location-modal-body" style="text-align: left; padding: 0 4px;">
         <p style="color: var(--text-dim); font-size: 13px; margin-bottom: 20px; line-height: 1.4;">
@@ -458,7 +458,7 @@
     <div class="modal-content location-modal-content">
       <div class="modal-head location-modal-head">
         <h3 class="modal-title">Set Location</h3>
-        <span class="close" data-modal="locationModal">&#10005;</span>
+        <button class="close" onclick="window.closeModal('locationModal')" aria-label="Close">&times;</button>
       </div>
       <div class="location-modal-body">
         <input type="text" id="manualLocation" placeholder="Enter city/location manually" class="location-input">
@@ -478,7 +478,6 @@
   <!-- TOAST POPUP CONTAINER -->
   <div id="toastContainer"></div>
 
-  <script src="location.js" defer></script>
   <!-- Footer Ticker -->
   <footer class="site-footer">
     <div class="footer-glow-line"></div>
