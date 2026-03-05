@@ -531,50 +531,38 @@ document.addEventListener("DOMContentLoaded", () => {
     this.classList.toggle("light-mode", dark);
   });
 
-  /* ── Particle Background ── */
-  (function bg() {
-    const cv = document.getElementById("bgCanvas"); if (!cv) return;
-    const c = cv.getContext("2d"); let W, H;
-    function resize() { W = cv.width = innerWidth; H = cv.height = innerHeight; }
-    resize(); window.addEventListener("resize", resize);
-    const DOTS = Array.from({ length: 55 }, () => ({
-      x: Math.random() * 1920, y: Math.random() * 1080,
-      vx: (Math.random() - .5) * .16, vy: (Math.random() - .5) * .16,
-      r: Math.random() * 1.3 + .35, a: Math.random() * .38 + .14,
-    }));
-    let hp = 0;
-    function hexGrid() {
-      hp += .004; const gs = 72, cols = Math.ceil(W / (gs * 1.5)) + 2, rows = Math.ceil(H / (gs * .866)) + 2;
-      c.save(); c.globalAlpha = .016 + Math.sin(hp) * .005; c.strokeStyle = "#00e5ff"; c.lineWidth = .5;
-      for (let col = -1; col < cols; col++) for (let row = -1; row < rows; row++) {
-        const cx = col * gs * 1.5, cy = row * gs * .866 + (col % 2 ? gs * .433 : 0);
-        c.beginPath();
-        for (let i = 0; i < 6; i++) { const ang = i / 6 * 6.28 - Math.PI / 6; const px = cx + Math.cos(ang) * gs * .47, py = cy + Math.sin(ang) * gs * .47; i ? c.lineTo(px, py) : c.moveTo(px, py); }
-        c.closePath(); c.stroke();
-      }
-      c.restore();
-    }
-    (function draw() {
-      c.clearRect(0, 0, W, H);
-      const light = document.documentElement.getAttribute("data-theme") === "light";
-      if (!light) hexGrid();
-      DOTS.forEach(p => {
-        p.x += p.vx; p.y += p.vy;
-        if (p.x < 0) p.x = W; if (p.x > W) p.x = 0; if (p.y < 0) p.y = H; if (p.y > H) p.y = 0;
-        c.beginPath(); c.arc(p.x, p.y, p.r, 0, 6.28);
-        c.fillStyle = light ? `rgba(0,80,180,${p.a * .2})` : `rgba(0,229,255,${p.a * .22})`; c.fill();
+  /* ── Background Canvas: handled by charts.js (weather animations) ── */
+
+
+  /* ── Footer Ticker ── */
+  const footerTicker = document.getElementById('footerTickerInner');
+  if (footerTicker) {
+    const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const nw = new Date();
+    const dateStr = `${DAYS[nw.getDay()]}, ${nw.getDate()} ${MONTHS[nw.getMonth()]} ${nw.getFullYear()}`;
+    const seg = `<div class="ft-segment">Made with <span class="ft-heart">❤</span><span class="ft-sep"></span><span class="ft-author">Tapananshu Tripathy</span><span class="ft-sep"></span><span class="ft-date">❆ ${dateStr} ❆</span><span class="ft-sep"></span>ENVCORE — Historical Dashboard<span class="ft-sep"></span>B.Tech CSE · KIIT University · Bhubaneswar</div>`;
+    footerTicker.innerHTML = seg + seg;
+  }
+
+  /* ── Custom Cursor ── */
+  const cursor = document.getElementById('customCursor');
+  const cursorRing = document.getElementById('customCursorRing');
+  if (cursor && cursorRing) {
+    document.addEventListener('mousemove', e => {
+      requestAnimationFrame(() => {
+        cursor.style.left = `${e.clientX}px`;
+        cursor.style.top = `${e.clientY}px`;
+        cursorRing.style.left = `${e.clientX}px`;
+        cursorRing.style.top = `${e.clientY}px`;
       });
-      for (let i = 0; i < DOTS.length; i++) for (let j = i + 1; j < DOTS.length; j++) {
-        const dx = DOTS[i].x - DOTS[j].x, dy = DOTS[i].y - DOTS[j].y, d = Math.sqrt(dx * dx + dy * dy);
-        if (d < 125) {
-          c.beginPath(); c.moveTo(DOTS[i].x, DOTS[i].y); c.lineTo(DOTS[j].x, DOTS[j].y);
-          c.strokeStyle = light ? `rgba(0,80,180,${.045 * (1 - d / 125)})` : `rgba(0,229,255,${.045 * (1 - d / 125)})`;
-          c.lineWidth = .5; c.stroke();
-        }
-      }
-      requestAnimationFrame(draw);
-    })();
-  })();
+    });
+    document.addEventListener('mousedown', () => document.body.classList.add('cursor-clicking'));
+    document.addEventListener('mouseup', () => document.body.classList.remove('cursor-clicking'));
+    const sel = 'a, button, input, textarea, .clickable';
+    document.body.addEventListener('mouseover', e => { if (e.target.closest(sel)) document.body.classList.add('cursor-hovering'); });
+    document.body.addEventListener('mouseout', e => { if (e.target.closest(sel)) document.body.classList.remove('cursor-hovering'); });
+  }
 
   /* ── Initial load ── */
   loadDate(todayStr());

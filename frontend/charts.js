@@ -416,6 +416,52 @@
     resize();
     window.addEventListener("resize", resize);
 
+    /* ── Self-fetching weather context for dashboard/alerts pages ── */
+    /* This mirrors script.js fetchCityWeather so all pages get live weather */
+    const WMO_LABELS = {
+      0: 'Clear sky', 1: 'Mainly clear', 2: 'Partly cloudy', 3: 'Overcast',
+      45: 'Fog', 48: 'Fog', 51: 'Drizzle', 53: 'Drizzle', 55: 'Drizzle',
+      61: 'Rain', 63: 'Rain', 65: 'Heavy rain', 71: 'Snow', 73: 'Snow', 75: 'Heavy snow',
+      80: 'Showers', 81: 'Showers', 82: 'Heavy showers', 85: 'Snow showers', 86: 'Snow showers',
+      95: 'Thunderstorm', 96: 'Thunderstorm', 99: 'Thunderstorm'
+    };
+    const WMO_ICONS = {
+      0: '☀️', 1: '🌤️', 2: '⛅', 3: '☁️', 45: '🌫️', 48: '🌫️', 51: '🌦️',
+      53: '🌦️', 55: '🌧️', 61: '🌧️', 63: '🌧️', 65: '🌧️', 71: '❄️', 73: '❄️', 75: '❄️',
+      95: '⛈️', 96: '⛈️', 99: '⛈️'
+    };
+
+    if (!window.cityWeatherContext) {
+      const lat = parseFloat(localStorage.getItem('user_lat')) || 20.35;
+      const lon = parseFloat(localStorage.getItem('user_lon')) || 85.82;
+      const today = new Date().toISOString().slice(0, 10);
+      fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&hourly=relative_humidity_2m&daily=sunrise,sunset&wind_speed_unit=kmh&timezone=auto&start_date=${today}&end_date=${today}`)
+        .then(r => r.json())
+        .then(data => {
+          const cw = data?.current_weather;
+          if (!cw) return;
+          const code = cw.weathercode ?? 0;
+          const srStr = data?.daily?.sunrise?.[0];
+          const ssStr = data?.daily?.sunset?.[0];
+          window.cityWeatherContext = {
+            condition: WMO_LABELS[code] || 'Clear sky',
+            icon: WMO_ICONS[code] || '🌤️',
+            temp: Math.round(cw.temperature ?? 25),
+            wind: Math.round(cw.windspeed ?? 5),
+            humidity: data?.hourly?.relative_humidity_2m?.[new Date().getHours()] ?? 60,
+            sunriseMs: srStr ? new Date(srStr).getTime() : null,
+            sunsetMs: ssStr ? new Date(ssStr).getTime() : null,
+          };
+        })
+        .catch(() => {
+          /* fallback — Bhubaneswar averages */
+          window.cityWeatherContext = { condition: 'Clear sky', icon: '☀️', temp: 25, wind: 5, humidity: 60, sunriseMs: null, sunsetMs: null };
+        });
+      /* Immediately set a default so the bg loop starts with something */
+      window.cityWeatherContext = window.cityWeatherContext || { condition: 'Clear sky', icon: '☀️', temp: 25, wind: 5, humidity: 60, sunriseMs: null, sunsetMs: null };
+    }
+
+
     const DOTS = Array.from({ length: 65 }, () => ({
       x: Math.random() * 1920, y: Math.random() * 1080,
       vx: (Math.random() - .5) * .18, vy: (Math.random() - .5) * .18,
@@ -435,6 +481,36 @@
     const SYMS = Array.from({ length: 40 }, () => {
       const s = newSym(); s.y = Math.random() * H; s.life = Math.random() * s.maxLife; return s;
     });
+
+    /* ── Stunning Weather Elements ── */
+    // Multi-layer rain for parallax effect
+    const RAIN_DROPS = Array.from({ length: 250 }, () => {
+      const z = Math.random() * 3 + 1; // 1 to 4 depth
+      return {
+        x: Math.random() * 1920,
+        y: Math.random() * 1080,
+        z: z,
+        len: Math.random() * 15 * z + 10,
+        vy: (Math.random() * 5 + 10) * z,
+        vx: (Math.random() - 0.5) * z * 1.5,
+        a: Math.random() * 0.2 + 0.1 * z
+      };
+    });
+
+    // Smooth, deep clouds
+    const CLOUDS = Array.from({ length: 8 }, () => {
+      const scale = Math.random() * 1.5 + 0.5;
+      return {
+        x: Math.random() * 1920,
+        y: Math.random() * Math.max(H * 0.4, 300) - 50,
+        size: 70 * scale,
+        vx: (Math.random() * 0.3 + 0.1) * scale,
+        a: Math.random() * 0.2 + 0.05
+      };
+    });
+
+    let sunRotation = 0;
+    let lightningFlash = 0;
 
     function drawDrop(x, y, sz, a, hue) { bx.save(); bx.translate(x, y); bx.globalAlpha = a; bx.strokeStyle = `hsl(${hue},90%,65%)`; bx.lineWidth = .9; bx.shadowColor = `hsl(${hue},90%,65%)`; bx.shadowBlur = 7; bx.beginPath(); bx.moveTo(0, -sz); bx.bezierCurveTo(sz * .85, -sz * .15, sz * .85, sz * .5, 0, sz * .82); bx.bezierCurveTo(-sz * .85, sz * .5, -sz * .85, -sz * .15, 0, -sz); bx.stroke(); bx.restore(); }
     function drawTherm(x, y, sz, a) { bx.save(); bx.translate(x, y); bx.globalAlpha = a; bx.strokeStyle = `rgba(255,110,80,${a})`; bx.lineWidth = 1.1; bx.shadowColor = "#ff4d4d"; bx.shadowBlur = 6; bx.beginPath(); bx.moveTo(-sz * .17, -sz); bx.lineTo(sz * .17, -sz); bx.lineTo(sz * .17, sz * .35); bx.lineTo(-sz * .17, sz * .35); bx.closePath(); bx.stroke(); bx.beginPath(); bx.arc(0, sz * .5, sz * .3, 0, 6.28); bx.fillStyle = `rgba(255,77,77,${a * .55})`; bx.fill(); bx.restore(); }
@@ -456,10 +532,222 @@
       bx.restore();
     }
 
+    function drawWeather(condStr, lightMode) {
+      if (!condStr) condStr = 'clear sky';
+      condStr = condStr.toLowerCase();
+
+      const isRainy = condStr.includes('rain') || condStr.includes('drizzle') || condStr.includes('shower');
+      const isCloudy = condStr.includes('cloud') || condStr.includes('overcast') || isRainy || condStr.includes('partly') || condStr.includes('mainly');
+      const isStormy = condStr.includes('thunder') || condStr.includes('storm');
+
+      /* ── True Day/Night using sunrise/sunset from API ── */
+      const srMs = window.cityWeatherContext?.sunriseMs;
+      const ssMs = window.cityWeatherContext?.sunsetMs;
+      const nowMs = Date.now();
+      let isNight;
+      if (srMs && ssMs) {
+        isNight = nowMs < srMs || nowMs > ssMs;
+      } else {
+        const h = new Date().getHours();
+        isNight = h >= 19 || h < 6;
+      }
+      const isDaytime = !isNight;
+
+      /* Cloud opacity scales with weather — thinner when clear, denser when cloudy */
+      const cloudAlphaMultiplier = isCloudy ? 1.0 : 0.25;
+
+      // 1) Lightning Flash Background (Bottom Layer of Weather)
+      if (isStormy && Math.random() < 0.005) lightningFlash = 1;
+      if (lightningFlash > 0) {
+        bx.save();
+        bx.fillStyle = `rgba(255, 255, 255, ${lightningFlash * 0.3})`;
+        bx.fillRect(0, 0, W, H);
+        bx.restore();
+        lightningFlash -= 0.05;
+      }
+
+      // 2a) The Astonishing Sun (Always visible during daytime)
+      if (isDaytime) {
+        bx.save();
+        const sunX = W * 0.85;
+        const sunY = H * 0.2;
+
+        /* Sun dims slightly behind clouds */
+        const sunAlpha = isCloudy ? 0.55 : 1.0;
+        bx.globalAlpha = sunAlpha;
+
+        sunRotation += 0.0015;
+        bx.translate(sunX, sunY);
+        bx.rotate(sunRotation);
+
+        // Intense Sun Glow
+        const glow = bx.createRadialGradient(0, 0, 30, 0, 0, 320);
+        if (lightMode) {
+          glow.addColorStop(0, 'rgba(255, 220, 50, 0.9)');
+          glow.addColorStop(0.3, 'rgba(255, 180, 0, 0.35)');
+          glow.addColorStop(1, 'transparent');
+        } else {
+          glow.addColorStop(0, 'rgba(255, 210, 0, 0.75)');
+          glow.addColorStop(0.4, 'rgba(255, 100, 0, 0.18)');
+          glow.addColorStop(1, 'transparent');
+        }
+
+        bx.beginPath();
+        bx.arc(0, 0, 320, 0, 6.28);
+        bx.fillStyle = glow;
+        bx.fill();
+
+        // Solid Core
+        bx.shadowColor = lightMode ? '#ffcc00' : '#ffaa00';
+        bx.shadowBlur = 50;
+        bx.fillStyle = lightMode ? '#ffdf00' : '#ffc400';
+        bx.beginPath();
+        bx.arc(0, 0, 48, 0, 6.28);
+        bx.fill();
+
+        // Graceful Rays
+        bx.strokeStyle = lightMode ? 'rgba(255, 200, 0, 0.65)' : 'rgba(255, 180, 0, 0.45)';
+        bx.lineWidth = 6;
+        bx.lineCap = 'round';
+        bx.globalAlpha = sunAlpha * 0.9;
+        for (let i = 0; i < 12; i++) {
+          bx.rotate(6.28 / 12);
+          bx.beginPath();
+          bx.moveTo(62, 0);
+          bx.lineTo(105 + Math.sin(sunRotation * 30 + i) * 16, 0);
+          bx.stroke();
+        }
+        bx.restore();
+      }
+
+      // 2b) The Glowing Moon + Stars (Always visible at night)
+      if (isNight) {
+        /* ── Twinkling Stars ── */
+        bx.save();
+        bx.globalAlpha = isCloudy ? 0.08 : 0.35;
+        for (let si = 0; si < 120; si++) {
+          /* deterministic star positions using si as seed */
+          const sx = ((si * 2971) % 1000) / 1000 * W;
+          const sy = ((si * 1847) % 700) / 700 * H * 0.8;
+          const sr2 = ((si * 3583) % 10) / 10 * 1.4 + 0.3;
+          /* flicker */
+          const flicker = 0.6 + 0.4 * Math.sin(Date.now() * 0.001 + si * 0.7);
+          bx.globalAlpha = (isCloudy ? 0.05 : 0.28) * flicker;
+          bx.fillStyle = '#ffffff';
+          bx.shadowColor = '#c8e8ff';
+          bx.shadowBlur = sr2 * 6;
+          bx.beginPath();
+          bx.arc(sx, sy, sr2, 0, 6.28);
+          bx.fill();
+        }
+        bx.restore();
+
+        /* ── Crescent Moon ── */
+        bx.save();
+        const moonX = W * 0.85;
+        const moonY = H * 0.2;
+        const moonAlpha = isCloudy ? 0.45 : 1.0;
+
+        bx.translate(moonX, moonY);
+
+        // Soft lunar glow
+        const moonGlow = bx.createRadialGradient(0, 0, 20, 0, 0, 280);
+        const glowColor = '200, 232, 255';
+        moonGlow.addColorStop(0, `rgba(${glowColor}, ${0.55 * moonAlpha})`);
+        moonGlow.addColorStop(0.4, `rgba(${glowColor}, ${0.12 * moonAlpha})`);
+        moonGlow.addColorStop(1, 'transparent');
+
+        bx.beginPath();
+        bx.arc(0, 0, 280, 0, 6.28);
+        bx.fillStyle = moonGlow;
+        bx.fill();
+
+        bx.shadowColor = `rgba(${glowColor}, 0.9)`;
+        bx.shadowBlur = 40;
+        bx.globalAlpha = moonAlpha;
+        bx.fillStyle = '#e8f4ff';
+        bx.beginPath();
+        bx.arc(0, 0, 44, 0, 6.28);
+        bx.fill();
+
+        // Carve out crescent shadow
+        bx.globalCompositeOperation = 'destination-out';
+        bx.globalAlpha = 1;
+        bx.beginPath();
+        bx.arc(-16, -8, 36, 0, 6.28);
+        bx.fill();
+
+        bx.globalCompositeOperation = 'source-over';
+        bx.restore();
+      }
+
+      // 3) Deep Floating Clouds (always present, opacity driven by weather)
+      CLOUDS.forEach(c => {
+        c.x += c.vx;
+        if (c.x > W + c.size * 2) c.x = -c.size * 3;
+
+        bx.save();
+        bx.translate(c.x, c.y);
+        const ca = c.a * cloudAlphaMultiplier;
+        bx.fillStyle = lightMode ? `rgba(220, 235, 255, ${ca})` : `rgba(180, 220, 255, ${ca * 0.8})`;
+        bx.shadowColor = lightMode ? "rgba(255,255,255,0.8)" : "rgba(20,30,60,0.5)";
+        bx.shadowBlur = 40;
+        bx.beginPath();
+        bx.arc(0, 0, c.size, 0, 6.28);
+        bx.arc(c.size * 0.8, -c.size * 0.4, c.size * 0.9, 0, 6.28);
+        bx.arc(c.size * 1.6, 0, c.size * 0.85, 0, 6.28);
+        bx.arc(c.size * 0.8, c.size * 0.3, c.size * 0.7, 0, 6.28);
+        bx.fill();
+        bx.restore();
+      });
+
+      // 4) Dynamic Parallax Rain
+      if (isRainy) {
+        bx.save();
+        // Optional storm tilt
+        if (isStormy) {
+          RAIN_DROPS.forEach(r => r.vx += 0.05); // heavy wind
+        }
+
+        bx.lineCap = 'round';
+        RAIN_DROPS.forEach(r => {
+          r.x += r.vx;
+          r.y += r.vy;
+          if (r.y > H + r.len) {
+            r.y = -50;
+            r.x = Math.random() * W;
+            if (isStormy && r.x > W) r.x = -50; // wrap wind
+          }
+          if (r.x > W + 50) r.x = -50;
+          if (r.x < -50) r.x = W + 50;
+
+          // Dynamic color based on depth
+          bx.strokeStyle = lightMode
+            ? `rgba(0, 80, 200, ${r.a})`
+            : `rgba(0, 229, 255, ${r.a})`;
+          bx.lineWidth = r.z * 1.2;
+
+          bx.beginPath();
+          bx.moveTo(r.x, r.y);
+          bx.lineTo(r.x + (r.vx * (r.len / r.vy)), r.y + r.len);
+          bx.stroke();
+        });
+        bx.restore();
+      }
+    }
+
     (function draw() {
       bx.clearRect(0, 0, W, H);
       const light = document.documentElement.getAttribute("data-theme") === "light";
+
+      // Base backgrounds
       if (!light) hexGrid();
+
+      // Weather Animations layer — fetch weather if script.js hasn't done it already
+      const weatherCond = window.cityWeatherContext?.condition;
+      drawWeather(weatherCond, light);
+
+      // Particle elements (dots, symbols)
       DOTS.forEach(p => {
         p.x += p.vx; p.y += p.vy;
         if (p.x < 0) p.x = W; if (p.x > W) p.x = 0; if (p.y < 0) p.y = H; if (p.y > H) p.y = 0;

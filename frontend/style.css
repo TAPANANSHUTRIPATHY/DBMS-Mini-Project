@@ -61,6 +61,8 @@
 
 html {
   scroll-behavior: smooth;
+  cursor: none;
+  /* Hide default cursor */
 }
 
 body {
@@ -70,6 +72,89 @@ body {
   min-height: 100vh;
   overflow-x: hidden;
   transition: background 0.4s ease, color 0.4s ease;
+  cursor: none;
+  /* Hide default cursor */
+}
+
+/* =====================================================
+   GLOWING CUSTOM CURSOR
+===================================================== */
+#customCursor {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 12px;
+  height: 12px;
+  background: var(--cyan);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 10000;
+  mix-blend-mode: screen;
+  box-shadow: 0 0 20px 4px var(--cyan);
+  transform: translate(-50%, -50%);
+  /* Start centered on mouse, handled in JS */
+  transition: width 0.2s, height 0.2s, background 0.2s;
+}
+
+#customCursorRing {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--cyan);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 9999;
+  mix-blend-mode: screen;
+  transform: translate(-50%, -50%);
+  /* Base transform */
+  transition: width 0.2s, height 0.2s, border-color 0.2s;
+}
+
+[data-theme="light"] #customCursor {
+  background: var(--blue);
+  box-shadow: 0 0 15px 4px var(--blue);
+  mix-blend-mode: multiply;
+}
+
+[data-theme="light"] #customCursorRing {
+  border-color: var(--blue);
+  mix-blend-mode: multiply;
+}
+
+/* Hovering effect */
+body.cursor-hovering #customCursor {
+  width: 8px;
+  height: 8px;
+  background: var(--green);
+  box-shadow: 0 0 25px 5px var(--green);
+}
+
+body.cursor-hovering #customCursorRing {
+  width: 60px;
+  height: 60px;
+  border-color: var(--green);
+  border-width: 2px;
+  background: rgba(0, 255, 136, 0.05);
+}
+
+/* Clicking effect */
+body.cursor-clicking #customCursor {
+  transform: translate(-50%, -50%) scale(0.6);
+}
+
+body.cursor-clicking #customCursorRing {
+  transform: translate(-50%, -50%) scale(0.8);
+  border-width: 3px;
+}
+
+a,
+button,
+.clickable,
+input,
+.close[data-modal] {
+  cursor: none !important;
 }
 
 /* ---- Particle BG ---- */
@@ -121,12 +206,28 @@ header {
   backdrop-filter: blur(12px);
   position: sticky;
   top: 0;
-  z-index: 50;
+  z-index: 1000;
   transition: background 0.4s;
 }
 
 [data-theme="light"] header {
   background: rgba(232, 244, 255, 0.85);
+}
+
+/* ── Dynamic Signal Bar Colors ── */
+.sig-excellent .active {
+  background: #00ff88;
+  box-shadow: 0 0 8px #00ff88;
+}
+
+.sig-good .active {
+  background: #ffcc00;
+  box-shadow: 0 0 8px #ffcc00;
+}
+
+.sig-bad .active {
+  background: #ff4d4d;
+  box-shadow: 0 0 8px #ff4d4d;
 }
 
 .header-left {
@@ -313,18 +414,22 @@ h1 {
 .alert-banner {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 18px;
-  background: linear-gradient(90deg, rgba(255, 77, 77, 0.18), rgba(255, 150, 0, 0.10));
-  border-bottom: 1px solid rgba(255, 77, 77, 0.35);
-  border-left: 5px solid var(--alert-color, #ff4d4d);
+  padding: 8px 0;
+  background: linear-gradient(90deg, rgba(0, 229, 255, 0.07), rgba(0, 100, 180, 0.04));
+  border-bottom: 1px solid rgba(0, 229, 255, 0.18);
+  border-top: 1px solid rgba(0, 229, 255, 0.1);
   font-family: 'Rajdhani', sans-serif;
   font-size: 14px;
-  font-weight: 700;
-  color: #fff;
-  letter-spacing: .5px;
+  font-weight: 600;
+  color: rgba(200, 232, 255, 0.9);
+  letter-spacing: .8px;
   overflow: hidden;
-  transition: border-color 0.3s;
+  /* Stick just below the fixed header */
+  position: sticky;
+  top: var(--header-h, 64px);
+  z-index: 900;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .alert-banner.hidden {
@@ -336,17 +441,21 @@ h1 {
   flex: 1;
   overflow: hidden;
   position: relative;
-  height: 20px;
+  height: 22px;
+  mask-image: linear-gradient(90deg, transparent, black 5%, black 95%, transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent, black 5%, black 95%, transparent);
 }
 
-/* The actual scrolling text */
+/* The actual scrolling text — smooth, pre-positioned, no flicker */
 .alert-ticker-text {
   position: absolute;
   top: 0;
   left: 0;
   white-space: nowrap;
-  animation: tickerScroll 28s linear infinite;
+  animation: tickerScroll 60s linear infinite;
   will-change: transform;
+  /* Prevents the text jumping on content change */
+  transition: none;
 }
 
 @keyframes tickerScroll {
@@ -357,28 +466,27 @@ h1 {
   100% {
     transform: translateX(-50%);
   }
-
-  /* -50% because text is duplicated */
 }
 
-
-.alert-icon {
-  font-size: 18px;
-  animation: alertPulse 1s ease-in-out infinite;
-}
-
-.alert-close {
-  margin-left: auto;
-  cursor: pointer;
-  background: none;
-  border: none;
+/* ---- No Data Sub Label ---- */
+.no-data-sub {
+  font-size: 11px;
+  font-family: 'Rajdhani', sans-serif;
   color: var(--text-dim);
-  font-size: 16px;
-  transition: color 0.2s;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-top: 4px;
+  opacity: 0.8;
 }
 
-.alert-close:hover {
-  color: var(--red);
+[data-theme="light"] .no-data-sub {
+  color: var(--text-dim);
+}
+
+[data-theme="light"] .alert-banner {
+  background: linear-gradient(90deg, rgba(0, 80, 200, 0.05), rgba(0, 50, 150, 0.03));
+  border-bottom: 1px solid rgba(0, 80, 200, 0.15);
+  color: var(--text);
 }
 
 /* ======= SECTION LABELS ======= */
@@ -1067,7 +1175,7 @@ h1 {
   display: none;
   position: fixed;
   inset: 0;
-  z-index: 200;
+  z-index: 1100;
   background: var(--modal-bg);
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
@@ -1120,13 +1228,18 @@ h1 {
   border: 1px solid var(--border);
   color: var(--text-dim);
   cursor: pointer;
-  font-size: 16px;
+  font-size: 18px;
   transition: all 0.2s;
+  background: transparent;
+  padding: 0;
+  line-height: 1;
+  flex-shrink: 0;
 }
 
 .close:hover {
   color: var(--red);
   border-color: var(--red);
+  background: rgba(255, 77, 77, 0.08);
 }
 
 .modal-stats-bar {
@@ -1598,7 +1711,7 @@ h1 {
   position: fixed;
   bottom: 30px;
   right: 30px;
-  z-index: 300;
+  z-index: 1200;
   display: flex;
   flex-direction: column-reverse;
   gap: 10px;
@@ -2751,9 +2864,13 @@ h1 {
   border-top: none;
   border-bottom: 1px solid var(--border);
   padding: 10px 36px;
-  position: relative;
-  z-index: 3;
+  position: sticky;
+  top: calc(var(--header-h, 64px) + 39px);
+  /* header + ticker height */
+  z-index: 890;
   flex-wrap: wrap;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
 }
 
 .dsp-item {
@@ -2934,4 +3051,106 @@ h1 {
   border-color: #ffcc00 !important;
   box-shadow: 0 0 16px rgba(255, 204, 0, .2) !important;
   color: #ffcc00 !important;
+}
+
+
+/* ================================================================
+   FOOTER TICKER
+================================================================ */
+.site-footer {
+  position: relative;
+  width: 100%;
+  margin-top: 4rem;
+  overflow: hidden;
+  background: rgba(6, 16, 30, 0.9);
+}
+
+.footer-glow-line {
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(0, 229, 255, 0.6) 40%, rgba(0, 255, 136, 0.5) 60%, transparent 100%);
+}
+
+.footer-ticker-wrap {
+  overflow: hidden;
+  padding: 12px 0;
+  mask-image: linear-gradient(90deg, transparent, black 6%, black 94%, transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent, black 6%, black 94%, transparent);
+}
+
+.footer-ticker-inner {
+  display: inline-flex;
+  white-space: nowrap;
+  animation: footerScroll 40s linear infinite;
+  will-change: transform;
+}
+
+.footer-ticker-inner .ft-segment {
+  display: inline-flex;
+  align-items: center;
+  gap: 28px;
+  padding: 0 40px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  color: rgba(200, 232, 255, 0.55);
+}
+
+.footer-ticker-inner .ft-heart {
+  color: #ff4d4d;
+  font-size: 16px;
+  display: inline-block;
+  animation: pulseGlow 1.8s ease-in-out infinite alternate;
+}
+
+.footer-ticker-inner .ft-author {
+  color: var(--cyan);
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+}
+
+.footer-ticker-inner .ft-date {
+  color: rgba(0, 255, 136, 0.7);
+  font-size: 12px;
+  letter-spacing: 1.5px;
+}
+
+.footer-ticker-inner .ft-sep {
+  display: inline-block;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(0, 229, 255, 0.4);
+  vertical-align: middle;
+}
+
+@keyframes footerScroll {
+  0% {
+    transform: translateX(0);
+  }
+
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+[data-theme="light"] .site-footer {
+  background: rgba(240, 248, 255, 0.95);
+}
+
+[data-theme="light"] .footer-glow-line {
+  background: linear-gradient(90deg, transparent, rgba(0, 80, 200, 0.4), rgba(0, 120, 60, 0.3), transparent);
+}
+
+[data-theme="light"] .footer-ticker-inner .ft-segment {
+  color: var(--text-dim);
+}
+
+[data-theme="light"] .footer-ticker-inner .ft-author {
+  color: var(--blue);
+}
+
+[data-theme="light"] .footer-ticker-inner .ft-date {
+  color: var(--green);
 }
