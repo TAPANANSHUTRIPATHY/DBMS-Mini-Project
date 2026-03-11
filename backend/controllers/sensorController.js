@@ -35,11 +35,10 @@ exports.getHistory = async (req, res) => {
     let result;
 
     if (req.query.date) {
-      // Convert created_at to IST (UTC+5:30) before comparing dates
-      // Fixes: data from 12am-5:30am IST was showing on wrong UTC date
+      // Filter by UTC date — matches exactly what Neon console shows per date
       result = await pool.query(
         `SELECT * FROM sensor_data
-         WHERE (created_at AT TIME ZONE 'Asia/Kolkata')::date = $1::date
+         WHERE created_at::date = $1::date
          ORDER BY created_at ASC`,
         [req.query.date]
       );
