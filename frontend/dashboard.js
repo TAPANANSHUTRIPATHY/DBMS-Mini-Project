@@ -262,12 +262,22 @@ function update24hrChart(dateRows) {
   const aqiSlots = new Array(24).fill(null);
 
   dateRows.forEach(r => {
-    const hour = new Date(r.created_at).getHours();
+    // Get the hour in the local time zone (IST if the user is in IST)
+    // The Date object automatically converts the UTC timestamp to local time
+    const d = new Date(r.created_at);
+    const hour = d.getHours();
+
+    // Check if the record actually belongs to the selected local date
+    // Because backend returns 5:30 excess records for UTC crossover
+    const localDateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    if (localDateStr !== selectedDate) return;
+
     const temp = parseFloat(r.temperature);
     const hum = parseFloat(r.humidity);
     const aqi = parseFloat(r.air_quality);
-    if (!isNaN(temp)) tempSlots[hour] = temp;
-    if (!isNaN(hum)) humSlots[hour] = hum;
+
+    if (!isNaN(temp) && temp !== 0) tempSlots[hour] = temp;
+    if (!isNaN(hum) && hum !== 0) humSlots[hour] = hum;
     if (!isNaN(aqi)) aqiSlots[hour] = aqi;
   });
 

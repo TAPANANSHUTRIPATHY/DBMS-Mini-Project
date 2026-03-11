@@ -35,10 +35,11 @@ exports.getHistory = async (req, res) => {
     let result;
 
     if (req.query.date) {
-      // Filter by UTC date — matches exactly what Neon console shows per date
+      // Calculate IST midnight range equivalent in UTC
       result = await pool.query(
         `SELECT * FROM sensor_data
-         WHERE created_at::date = $1::date
+         WHERE created_at >= ($1::date AT TIME ZONE 'Asia/Kolkata')
+           AND created_at <  ($1::date + interval '1 day' AT TIME ZONE 'Asia/Kolkata')
          ORDER BY created_at ASC`,
         [req.query.date]
       );
