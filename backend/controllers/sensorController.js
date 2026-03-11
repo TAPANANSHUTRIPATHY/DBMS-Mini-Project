@@ -35,18 +35,26 @@ exports.getHistory = async (req, res) => {
     let result;
 
     if (req.query.date) {
-      // Filter by specific date in SQL — only ~288 rows transferred instead of 100,000+
+      // Convert created_at to IST (UTC+5:30) before comparing dates
+      // Fixes: data from 12am-5:30am IST was appearing on the wrong date (UTC)
+      // Also filters out sensor error readings where temperature/humidity = 0
       result = await pool.query(
         `SELECT * FROM sensor_data
-         WHERE created_at::date = $1::date
+         WHERE (created_at AT TIME ZONE 'Asia/Kolkata')::date = $1::date
+           AND temperature IS NOT NULL AND temperature != 0
+           AND humidity IS NOT NULL AND humidity != 0
          ORDER BY created_at ASC`,
         [req.query.date]
       );
     } else {
-      // No date supplied — return last 500 rows as fallback
+      // No date supplied — return last 500 valid rows as fallback
       result = await pool.query(
-        `SELECT * FROM (SELECT * FROM sensor_data ORDER BY created_at DESC LIMIT 500) sub
-         ORDER BY created_at ASC`
+        `SELECT * FROM (
+           SELECT * FROM sensor_data
+           WHERE temperature IS NOT NULL AND temperature != 0
+             AND humidity IS NOT NULL AND humidity != 0
+           ORDER BY created_at DESC LIMIT 500
+         ) sub ORDER BY created_at ASC`
       );
     }
 

@@ -64,7 +64,9 @@ function localDate(isoStr) {
   return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
 }
 
-function fmtTime(isoStr) { return new Date(isoStr).toLocaleTimeString("en-GB"); }
+function fmtTime(isoStr) {
+  return new Date(isoStr).toLocaleTimeString("en-GB", { timeZone: "Asia/Kolkata" });
+}
 function fmtLong(dateStr) {
   return new Date(dateStr + "T12:00:00").toLocaleDateString("en-GB",
     { weekday: "long", year: "numeric", month: "long", day: "numeric" });
