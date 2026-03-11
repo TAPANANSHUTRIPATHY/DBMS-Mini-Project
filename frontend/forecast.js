@@ -88,9 +88,13 @@
         });
     }
 
-    /* ── 3-dataset master chart ── Fixed 24-hour axis, null gaps */
-    /* Labels: "00:00", "01:00" … "23:00" */
-    const MASTER_HOURS = Array.from({ length: 24 }, (_, h) => `${String(h).padStart(2, "0")}:00`);
+    /* ── 3-dataset master chart ── Fixed 48-slot axis (30-min), null gaps */
+    /* Labels: "00:00", "00:30" … "23:30" */
+    const MASTER_HOURS = Array.from({ length: 48 }, (_, i) => {
+        const h = Math.floor(i / 2);
+        const m = i % 2 === 0 ? "00" : "30";
+        return `${String(h).padStart(2, "0")}:${m}`;
+    });
 
     function makeMasterChart(canvasId) {
         const c = ctx(canvasId);
@@ -103,7 +107,7 @@
                     {
                         label: "Temperature (°C)", borderColor: COLORS.temp,
                         backgroundColor: rgba(COLORS.temp, 0.08),
-                        data: new Array(24).fill(null),
+                        data: new Array(48).fill(null),
                         tension: 0.4, pointRadius: 2, pointHoverRadius: 5,
                         borderWidth: 2.5, yAxisID: "y", fill: false,
                         spanGaps: false
@@ -111,7 +115,7 @@
                     {
                         label: "Humidity (%)", borderColor: COLORS.hum,
                         backgroundColor: rgba(COLORS.hum, 0.08),
-                        data: new Array(24).fill(null),
+                        data: new Array(48).fill(null),
                         tension: 0.4, pointRadius: 2, pointHoverRadius: 5,
                         borderWidth: 2.5, yAxisID: "y1", fill: false,
                         spanGaps: false
@@ -119,7 +123,7 @@
                     {
                         label: "Air Quality Index", borderColor: COLORS.aqi,
                         backgroundColor: rgba(COLORS.aqi, 0.08),
-                        data: new Array(24).fill(null),
+                        data: new Array(48).fill(null),
                         tension: 0.4, pointRadius: 2, pointHoverRadius: 5,
                         borderWidth: 2.5, yAxisID: "y2", fill: false,
                         spanGaps: false
@@ -146,23 +150,26 @@
                 },
                 scales: {
                     x: {
-                        ticks: { color: TICK, font: { family: FONT, size: 10 }, maxTicksLimit: 24 },
+                        ticks: { color: TICK, font: { family: FONT, size: 10 }, maxTicksLimit: 48, maxRotation: 45 },
                         grid: { color: GRID }
                     },
                     y: {
                         type: "linear", position: "left",
+                        grace: "15%",
                         ticks: { color: COLORS.temp, font: { family: FONT, size: 10 } },
                         grid: { color: GRID },
                         title: { display: true, text: "Temp (°C)", color: COLORS.temp, font: { family: FONT, size: 10 } }
                     },
                     y1: {
                         type: "linear", position: "right",
+                        grace: "15%",
                         ticks: { color: COLORS.hum, font: { family: FONT, size: 10 } },
                         grid: { drawOnChartArea: false },
                         title: { display: true, text: "Humidity (%)", color: COLORS.hum, font: { family: FONT, size: 10 } }
                     },
                     y2: {
                         type: "linear", position: "right",
+                        grace: "20%",
                         ticks: { color: COLORS.aqi, font: { family: FONT, size: 10 } },
                         grid: { drawOnChartArea: false },
                         title: { display: true, text: "AQI", color: COLORS.aqi, font: { family: FONT, size: 10 } }
@@ -189,10 +196,10 @@
 
     /* ── Clear all charts (no data) ── */
     function clearAll() {
-        /* Master charts: reset to 24 nulls */
+        /* Master charts: reset to 48 nulls */
         [masterChart, masterLargeChart].forEach(ch => {
             if (!ch) return;
-            ch.data.datasets.forEach(ds => (ds.data = new Array(24).fill(null)));
+            ch.data.datasets.forEach(ds => (ds.data = new Array(48).fill(null)));
             ch.update("none");
         });
         /* Tile charts: reset to 7 nulls (keeps 7-day axis, line flat/empty) */
@@ -272,19 +279,33 @@
             return localDate === todayStr;
         });
 
-        /* ── Master graph: today's data bucketed by hour slot (null = no reading) ── */
-        const masterTempSlots = new Array(24).fill(null);
-        const masterHumSlots = new Array(24).fill(null);
-        const masterAqiSlots = new Array(24).fill(null);
+        /* ── Master graph: today's data bucketed by 30-min slot (null = no reading) ── */
+        const masterTempSlots = new Array(48).fill(null);
+        const masterHumSlots = new Array(48).fill(null);
+        const masterAqiSlots = new Array(48).fill(null);
+
+        let lastSlotIndex = -1;
 
         todayRows.forEach(r => {
-            const hour = new Date(r.created_at).getHours();
+            const d = new Date(r.created_at);
+            const slot = (d.getHours() * 2) + Math.floor(d.getMinutes() / 30);
+            if (slot > lastSlotIndex) lastSlotIndex = slot;
+
             const temp = parseFloat(r.temperature);
             const hum = parseFloat(r.humidity);
             const aqi = parseFloat(r.air_quality);
-            if (!isNaN(temp)) masterTempSlots[hour] = temp;
-            if (!isNaN(hum)) masterHumSlots[hour] = hum;
-            if (!isNaN(aqi)) masterAqiSlots[hour] = aqi;
+            if (!isNaN(temp)) masterTempSlots[slot] = temp;
+            if (!isNaN(hum)) masterHumSlots[slot] = hum;
+            if (!isNaN(aqi)) masterAqiSlots[slot] = aqi;
+        });
+
+        // Add the rhythmic "pulse" size to the very last datapoint
+        [masterChart, masterLargeChart].forEach(ch => {
+            if (!ch) return;
+            ch.data.datasets.forEach(ds => {
+                ds.pointRadius = ds.data.map((val, idx) => (val !== null && idx === lastSlotIndex) ? 6 : 2);
+                ds.pointHoverRadius = ds.data.map((val, idx) => (val !== null && idx === lastSlotIndex) ? 8 : 5);
+            });
         });
 
         updateMasterBoth(masterTempSlots, masterHumSlots, masterAqiSlots);
