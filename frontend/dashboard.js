@@ -19,8 +19,12 @@ const FONT = "Rajdhani";
 const TICK = "rgba(200,232,255,0.72)";
 const GRID = "rgba(255,255,255,0.06)";
 
-/* Fixed 24-hour X-axis labels */
-const HOURS_24 = Array.from({ length: 24 }, (_, h) => `${String(h).padStart(2, "0")}:00`);
+/* 48-slot X-axis labels (30-min intervals) */
+const HOURS_48 = Array.from({ length: 48 }, (_, i) => {
+  const h = Math.floor(i / 2);
+  const m = i % 2 === 0 ? "00" : "30";
+  return `${String(h).padStart(2, "0")}:${m}`;
+});
 
 const COLORS = {
   temp: "rgb(255,128,128)",
@@ -45,6 +49,7 @@ let db24hrChart = null;
    RAW DATA CACHE  — avoid re-fetching within 60 s
 ================================================================ */
 let _cachedRaw = null;
+let _cachedDate = null;  /* date string the cache belongs to */
 let _cacheExpiry = 0;    /* epoch ms */
 const CACHE_TTL = 60000; /* 60 s */
 
@@ -63,7 +68,9 @@ function localDate(isoStr) {
   return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
 }
 
-function fmtTime(isoStr) { return new Date(isoStr).toLocaleTimeString("en-GB"); }
+function fmtTime(isoStr) {
+  return new Date(isoStr).toLocaleTimeString("en-GB");
+}
 function fmtLong(dateStr) {
   return new Date(dateStr + "T12:00:00").toLocaleDateString("en-GB",
     { weekday: "long", year: "numeric", month: "long", day: "numeric" });
@@ -140,26 +147,26 @@ function build24hrChart(id) {
   return new Chart(el.getContext("2d"), {
     type: "line",
     data: {
-      labels: HOURS_24,
+      labels: HOURS_48,
       datasets: [
         {
           label: "Temperature (°C)", borderColor: COLORS.temp,
           backgroundColor: rgba(COLORS.temp, 0.08),
-          data: new Array(24).fill(null),
+          data: new Array(48).fill(null),
           tension: 0.4, pointRadius: 3, pointHoverRadius: 6,
           borderWidth: 2.5, yAxisID: "y", fill: false, spanGaps: false,
         },
         {
           label: "Humidity (%)", borderColor: COLORS.hum,
           backgroundColor: rgba(COLORS.hum, 0.08),
-          data: new Array(24).fill(null),
+          data: new Array(48).fill(null),
           tension: 0.4, pointRadius: 3, pointHoverRadius: 6,
           borderWidth: 2.5, yAxisID: "y1", fill: false, spanGaps: false,
         },
         {
           label: "Air Quality Index", borderColor: COLORS.aqi,
           backgroundColor: rgba(COLORS.aqi, 0.08),
-          data: new Array(24).fill(null),
+          data: new Array(48).fill(null),
           tension: 0.4, pointRadius: 3, pointHoverRadius: 6,
           borderWidth: 2.5, yAxisID: "y2", fill: false, spanGaps: false,
         },
@@ -184,19 +191,22 @@ function build24hrChart(id) {
         },
       },
       scales: {
-        x: { ticks: { color: TICK, font: { family: FONT, size: 10 }, maxTicksLimit: 24 }, grid: { color: GRID } },
+        x: { ticks: { color: TICK, font: { family: FONT, size: 10 }, maxTicksLimit: 48, maxRotation: 45 }, grid: { color: GRID } },
         y: {
           type: "linear", position: "left",
+          grace: "15%",
           ticks: { color: COLORS.temp, font: { family: FONT, size: 10 } }, grid: { color: GRID },
           title: { display: true, text: "Temp (°C)", color: COLORS.temp, font: { family: FONT, size: 10 } },
         },
         y1: {
           type: "linear", position: "right",
+          grace: "15%",
           ticks: { color: COLORS.hum, font: { family: FONT, size: 10 } }, grid: { drawOnChartArea: false },
           title: { display: true, text: "Humidity (%)", color: COLORS.hum, font: { family: FONT, size: 10 } },
         },
         y2: {
           type: "linear", position: "right",
+          grace: "20%",
           ticks: { color: COLORS.aqi, font: { family: FONT, size: 10 } }, grid: { drawOnChartArea: false },
           title: { display: true, text: "AQI", color: COLORS.aqi, font: { family: FONT, size: 10 } },
         },
@@ -219,87 +229,74 @@ document.addEventListener("DOMContentLoaded", () => {
    First successful response wins. Result is cached 60 s so
    date switching and silent auto-refresh never re-fetch.
 ================================================================ */
-async function fetchAllRecords() {
-  /* Return cached data if still fresh */
-  if (_cachedRaw && Date.now() < _cacheExpiry) {
-    console.log(`[ENVCORE] Using cached data (${_cachedRaw.length} rows)`);
+async function fetchAllRecords(dateStr) {
+  /* Return cached data if still fresh AND same date */
+  if (_cachedRaw && Date.now() < _cacheExpiry && _cachedDate === dateStr) {
+    console.log(`[ENVCORE] Using cached data (${_cachedRaw.length} rows) for ${dateStr}`);
     return _cachedRaw;
   }
 
   const timeout = ms => ({ signal: AbortSignal.timeout(ms) });
 
-  /* Race all strategies in parallel — first successful response wins */
-  const candidates = [
-    `${API_DB}/history?limit=100000`,
-    `${API_DB}/history?limit=100000&all=true`,
-    `${API_DB}/history?per_page=100000`,
-    `${API_DB}/history/all`,
-    `${API_DB}/history`,
-  ];
+  try {
+    // Send date to backend — SQL filters, only ~288 rows returned instead of 100,000+
+    const url = dateStr
+      ? `${API_DB}/history?date=${dateStr}`
+      : `${API_DB}/history`;
 
-  const tryUrl = async (url) => {
     const r = await fetch(url, timeout(12000));
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    const j = await r.json();
-    if (!Array.isArray(j) || j.length === 0) throw new Error("Empty response");
-    return j;
-  };
+    const raw = await r.json();
+    if (!Array.isArray(raw)) throw new Error("Invalid response");
 
-  try {
-    const raw = await Promise.any(candidates.map(tryUrl));
-    console.log(`[ENVCORE] Fetched ${raw.length} records.`);
+    console.log(`[ENVCORE] Fetched ${raw.length} records for ${dateStr}.`);
     _cachedRaw = raw;
+    _cachedDate = dateStr;
     _cacheExpiry = Date.now() + CACHE_TTL;
     return raw;
-  } catch (_) {
-    console.warn("[ENVCORE] All parallel strategies failed, falling back to pagination.");
+  } catch (err) {
+    console.error("[ENVCORE] fetchAllRecords error:", err);
+    return [];
   }
-
-  /* Last resort — paginate /api/history manually */
-  try {
-    let all = [], page = 1, perPage = 100;
-    while (page <= 200) {
-      const r = await fetch(`${API_DB}/history?page=${page}&per_page=${perPage}`, timeout(8000));
-      if (!r.ok) break;
-      const j = await r.json();
-      const rows = Array.isArray(j) ? j : (Array.isArray(j.data) ? j.data : []);
-      if (!rows.length) break;
-      all = all.concat(rows);
-      if (rows.length < perPage) break;
-      page++;
-    }
-    if (all.length) {
-      _cachedRaw = all;
-      _cacheExpiry = Date.now() + CACHE_TTL;
-      return all;
-    }
-  } catch (_) { }
-
-  return [];
 }
 
+
 /* ================================================================
-   UPDATE 24HR MASTER CHART (date-aware hourly bucketing)
+   UPDATE 24HR MASTER CHART (30-min bucketing & live pulse fx)
 ================================================================ */
 function update24hrChart(dateRows) {
   if (!db24hrChart) return;
-  const tempSlots = new Array(24).fill(null);
-  const humSlots = new Array(24).fill(null);
-  const aqiSlots = new Array(24).fill(null);
+  const tempSlots = new Array(48).fill(null);
+  const humSlots = new Array(48).fill(null);
+  const aqiSlots = new Array(48).fill(null);
+
+  let lastSlotIndex = -1;
 
   dateRows.forEach(r => {
-    const hour = new Date(r.created_at).getHours();
+    const d = new Date(r.created_at);
+    // 30 minute bucketing logic (index 0 to 47):
+    const slot = (d.getHours() * 2) + Math.floor(d.getMinutes() / 30);
+    if (slot > lastSlotIndex) lastSlotIndex = slot;
+
     const temp = parseFloat(r.temperature);
     const hum = parseFloat(r.humidity);
     const aqi = parseFloat(r.air_quality);
-    if (!isNaN(temp)) tempSlots[hour] = temp;
-    if (!isNaN(hum)) humSlots[hour] = hum;
-    if (!isNaN(aqi)) aqiSlots[hour] = aqi;
+
+    if (!isNaN(temp) && temp !== 0) tempSlots[slot] = temp;
+    if (!isNaN(hum) && hum !== 0) humSlots[slot] = hum;
+    if (!isNaN(aqi)) aqiSlots[slot] = aqi;
   });
 
   db24hrChart.data.datasets[0].data = tempSlots;
   db24hrChart.data.datasets[1].data = humSlots;
   db24hrChart.data.datasets[2].data = aqiSlots;
+
+  // Add the rhythmic "pulse" size to the very last datapoint to match ISRO style telemetry graphs
+  db24hrChart.data.datasets.forEach(ds => {
+    ds.pointRadius = ds.data.map((val, idx) => (val !== null && idx === lastSlotIndex) ? 7 : 3);
+    ds.pointHoverRadius = ds.data.map((val, idx) => (val !== null && idx === lastSlotIndex) ? 9 : 6);
+  });
+
   db24hrChart.update("none");
 }
 
@@ -337,16 +334,17 @@ function updateSummary(data) {
     setEl("scHealthGrade", "No data");
     return;
   }
-  const T = data.map(d => parseFloat(d.temperature));
-  const H = data.map(d => parseFloat(d.humidity));
-  const A = data.map(d => parseFloat(d.air_quality));
-  const S = data.map(d => healthScore(d.temperature, d.humidity, d.air_quality));
-  const avgS = Math.round(avg(S));
+  const T = data.map(d => parseFloat(d.temperature)).filter(v => !isNaN(v) && v !== 0);
+  const H = data.map(d => parseFloat(d.humidity)).filter(v => !isNaN(v) && v !== 0);
+  const A = data.map(d => parseFloat(d.air_quality)).filter(v => !isNaN(v));
+  const S = data.map(d => healthScore(d.temperature, d.humidity, d.air_quality))
+    .filter(v => v > 0);
+  const avgS = S.length ? Math.round(avg(S)) : 0;
 
-  setEl("scTempAvg", s1(avg(T)) + "°C"); setEl("scTempMin", s1(Math.min(...T))); setEl("scTempMax", s1(Math.max(...T))); setEl("scTempCount", data.length);
-  setEl("scHumAvg", s1(avg(H)) + "%"); setEl("scHumMin", s1(Math.min(...H))); setEl("scHumMax", s1(Math.max(...H))); setEl("scHumCount", data.length);
-  setEl("scAqiAvg", Math.round(avg(A))); setEl("scAqiMin", Math.round(Math.min(...A))); setEl("scAqiMax", Math.round(Math.max(...A))); setEl("scAqiCount", data.length);
-  setEl("scHealthVal", avgS); setEl("scHealthMin", Math.min(...S)); setEl("scHealthMax", Math.max(...S)); setEl("scTotalRecords", data.length);
+  setEl("scTempAvg", T.length ? s1(avg(T)) + "°C" : "--"); setEl("scTempMin", T.length ? s1(Math.min(...T)) : "--"); setEl("scTempMax", T.length ? s1(Math.max(...T)) : "--"); setEl("scTempCount", data.length);
+  setEl("scHumAvg", H.length ? s1(avg(H)) + "%" : "--"); setEl("scHumMin", H.length ? s1(Math.min(...H)) : "--"); setEl("scHumMax", H.length ? s1(Math.max(...H)) : "--"); setEl("scHumCount", data.length);
+  setEl("scAqiAvg", A.length ? Math.round(avg(A)) : "--"); setEl("scAqiMin", A.length ? Math.round(Math.min(...A)) : "--"); setEl("scAqiMax", A.length ? Math.round(Math.max(...A)) : "--"); setEl("scAqiCount", data.length);
+  setEl("scHealthVal", avgS); setEl("scHealthMin", S.length ? Math.min(...S) : "--"); setEl("scHealthMax", S.length ? Math.max(...S) : "--"); setEl("scTotalRecords", data.length);
 
   const grade = avgS >= 80 ? "EXCELLENT" : avgS >= 60 ? "GOOD" : avgS >= 40 ? "MODERATE" : "POOR";
   setEl("scHealthGrade", grade);
@@ -439,10 +437,8 @@ async function loadDate(dateStr, silent = false) {
   }
 
   try {
-    const all = await fetchAllRecords();
-    const data = all
-      .filter(d => localDate(d.created_at) === dateStr)
-      .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    // Backend now filters by date in SQL — no client-side filter needed
+    const data = await fetchAllRecords(dateStr);
 
     console.log(`[ENVCORE] Records for ${dateStr}: ${data.length}`);
     allData = data;
