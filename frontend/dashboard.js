@@ -19,8 +19,12 @@ const FONT = "Rajdhani";
 const TICK = "rgba(200,232,255,0.72)";
 const GRID = "rgba(255,255,255,0.06)";
 
-/* Fixed 24-hour X-axis labels */
-const HOURS_24 = Array.from({ length: 24 }, (_, h) => `${String(h).padStart(2, "0")}:00`);
+/* 48-slot X-axis labels (30-min intervals) */
+const HOURS_48 = Array.from({ length: 48 }, (_, i) => {
+  const h = Math.floor(i / 2);
+  const m = i % 2 === 0 ? "00" : "30";
+  return `${String(h).padStart(2, "0")}:${m}`;
+});
 
 const COLORS = {
   temp: "rgb(255,128,128)",
@@ -143,26 +147,40 @@ function build24hrChart(id) {
   return new Chart(el.getContext("2d"), {
     type: "line",
     data: {
-      labels: HOURS_24,
+      labels: HOURS_48,
       datasets: [
         {
           label: "Temperature (°C)", borderColor: COLORS.temp,
+          segment: {
+            borderColor: ctx => {
+              if (!ctx.p0 || !ctx.p1) return COLORS.temp;
+              const y = ctx.p0.parsed.y;
+              return y >= 32 ? '#ff4d4d' : y >= 24 ? '#00ff88' : '#00e5ff';
+            }
+          },
           backgroundColor: rgba(COLORS.temp, 0.08),
-          data: new Array(24).fill(null),
+          data: new Array(48).fill(null),
           tension: 0.4, pointRadius: 3, pointHoverRadius: 6,
           borderWidth: 2.5, yAxisID: "y", fill: false, spanGaps: false,
         },
         {
           label: "Humidity (%)", borderColor: COLORS.hum,
           backgroundColor: rgba(COLORS.hum, 0.08),
-          data: new Array(24).fill(null),
+          data: new Array(48).fill(null),
           tension: 0.4, pointRadius: 3, pointHoverRadius: 6,
           borderWidth: 2.5, yAxisID: "y1", fill: false, spanGaps: false,
         },
         {
           label: "Air Quality Index", borderColor: COLORS.aqi,
+          segment: {
+            borderColor: ctx => {
+              if (!ctx.p0 || !ctx.p1) return COLORS.aqi;
+              const y = ctx.p0.parsed.y;
+              return y >= 100 ? '#ff4d4d' : y >= 60 ? '#ffcc00' : '#00ff88';
+            }
+          },
           backgroundColor: rgba(COLORS.aqi, 0.08),
-          data: new Array(24).fill(null),
+          data: new Array(48).fill(null),
           tension: 0.4, pointRadius: 3, pointHoverRadius: 6,
           borderWidth: 2.5, yAxisID: "y2", fill: false, spanGaps: false,
         },
@@ -187,19 +205,22 @@ function build24hrChart(id) {
         },
       },
       scales: {
-        x: { ticks: { color: TICK, font: { family: FONT, size: 10 }, maxTicksLimit: 24 }, grid: { color: GRID } },
+        x: { ticks: { color: TICK, font: { family: FONT, size: 10 }, maxTicksLimit: 48, maxRotation: 45 }, grid: { color: GRID } },
         y: {
           type: "linear", position: "left",
+          grace: "15%",
           ticks: { color: COLORS.temp, font: { family: FONT, size: 10 } }, grid: { color: GRID },
           title: { display: true, text: "Temp (°C)", color: COLORS.temp, font: { family: FONT, size: 10 } },
         },
         y1: {
           type: "linear", position: "right",
+          grace: "15%",
           ticks: { color: COLORS.hum, font: { family: FONT, size: 10 } }, grid: { drawOnChartArea: false },
           title: { display: true, text: "Humidity (%)", color: COLORS.hum, font: { family: FONT, size: 10 } },
         },
         y2: {
           type: "linear", position: "right",
+          grace: "20%",
           ticks: { color: COLORS.aqi, font: { family: FONT, size: 10 } }, grid: { drawOnChartArea: false },
           title: { display: true, text: "AQI", color: COLORS.aqi, font: { family: FONT, size: 10 } },
         },
@@ -255,31 +276,41 @@ async function fetchAllRecords(dateStr) {
 
 
 /* ================================================================
-   UPDATE 24HR MASTER CHART (date-aware hourly bucketing)
+   UPDATE 24HR MASTER CHART (30-min bucketing & live pulse fx)
 ================================================================ */
 function update24hrChart(dateRows) {
   if (!db24hrChart) return;
-  const tempSlots = new Array(24).fill(null);
-  const humSlots = new Array(24).fill(null);
-  const aqiSlots = new Array(24).fill(null);
+  const tempSlots = new Array(48).fill(null);
+  const humSlots = new Array(48).fill(null);
+  const aqiSlots = new Array(48).fill(null);
+
+  let lastSlotIndex = -1;
 
   dateRows.forEach(r => {
     const d = new Date(r.created_at);
-    // Use local browser hour so that 9 PM local time shows up exactly in the 21:00 bucket
-    const hour = d.getHours();
+    // 30 minute bucketing logic (index 0 to 47):
+    const slot = (d.getHours() * 2) + Math.floor(d.getMinutes() / 30);
+    if (slot > lastSlotIndex) lastSlotIndex = slot;
 
     const temp = parseFloat(r.temperature);
     const hum = parseFloat(r.humidity);
     const aqi = parseFloat(r.air_quality);
 
-    if (!isNaN(temp) && temp !== 0) tempSlots[hour] = temp;
-    if (!isNaN(hum) && hum !== 0) humSlots[hour] = hum;
-    if (!isNaN(aqi)) aqiSlots[hour] = aqi;
+    if (!isNaN(temp) && temp !== 0) tempSlots[slot] = temp;
+    if (!isNaN(hum) && hum !== 0) humSlots[slot] = hum;
+    if (!isNaN(aqi)) aqiSlots[slot] = aqi;
   });
 
   db24hrChart.data.datasets[0].data = tempSlots;
   db24hrChart.data.datasets[1].data = humSlots;
   db24hrChart.data.datasets[2].data = aqiSlots;
+
+  // Add the rhythmic "pulse" size to the very last datapoint to match ISRO style telemetry graphs
+  db24hrChart.data.datasets.forEach(ds => {
+    ds.pointRadius = ds.data.map((val, idx) => (val !== null && idx === lastSlotIndex) ? 7 : 3);
+    ds.pointHoverRadius = ds.data.map((val, idx) => (val !== null && idx === lastSlotIndex) ? 9 : 6);
+  });
+
   db24hrChart.update("none");
 }
 
@@ -468,6 +499,42 @@ document.addEventListener("DOMContentLoaded", () => {
     a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
     a.download = `exports/${fname}`; document.body.appendChild(a); a.click();
     document.body.removeChild(a);
+  });
+
+  document.getElementById("pdfBtn")?.addEventListener("click", () => {
+    if (!allData.length) { alert("No data for this date."); return; }
+    const exportArea = document.querySelector(".db-wrap");
+    const actions = document.querySelector(".date-bar-right");
+    actions.style.display = "none";
+
+    // Set export button to loading state
+    const pdfBtn = document.getElementById("pdfBtn");
+    const origText = pdfBtn.innerHTML;
+    pdfBtn.innerHTML = "Generating...";
+
+    html2canvas(exportArea, { scale: 1.5, backgroundColor: "#06101e", useCORS: true }).then(canvas => {
+      actions.style.display = "flex";
+      pdfBtn.innerHTML = origText;
+
+      const imgData = canvas.toDataURL("image/jpeg", 0.95);
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF("p", "mm", "a4");
+
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+      // Add a header
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(16);
+      pdf.text(`ENVCORE Dashboard Report: ${selectedDate}`, 15, 15);
+
+      pdf.addImage(imgData, "JPEG", 5, 25, pdfWidth - 10, pdfHeight);
+      pdf.save(`ENVCORE_Report_${selectedDate}.pdf`);
+    }).catch(err => {
+      actions.style.display = "flex";
+      pdfBtn.innerHTML = origText;
+      console.error("PDF generation failed", err);
+    });
   });
 
   /* ── Date Picker ── */

@@ -13,6 +13,8 @@
     href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Rajdhani:wght@300;400;500;600&display=swap"
     rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 
 <body>
@@ -70,6 +72,7 @@
       <div class="date-bar-right">
         <span class="record-count" id="recordCount">-- records</span>
         <div class="csv-notice">Saves to <code>exports/</code></div>
+        <button class="db-btn" id="pdfBtn">&#128196; Export PDF</button>
         <button class="db-btn" id="csvBtn">&#128228; Download CSV</button>
       </div>
     </div>

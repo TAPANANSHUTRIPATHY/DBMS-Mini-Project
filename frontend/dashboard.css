@@ -41,7 +41,7 @@
   font-size: 14px;
   padding: 8px 14px;
   cursor: pointer;
-  transition: border-color .2s;
+  transition: all 0.3s ease;
 }
 
 .date-input:focus {
@@ -70,7 +70,7 @@
   font-weight: 600;
   cursor: pointer;
   background: transparent;
-  transition: all .2s;
+  transition: all 0.3s ease;
 }
 
 .qd-btn:hover,
@@ -123,7 +123,7 @@
   font-weight: 600;
   letter-spacing: 2px;
   cursor: pointer;
-  transition: all .25s;
+  transition: all 0.3s ease;
   white-space: nowrap;
 }
 
@@ -142,12 +142,14 @@
 }
 
 .sum-card {
-  background: linear-gradient(135deg, var(--surface), var(--bg2));
+  background: linear-gradient(135deg, var(--surface-glass), var(--bg2-glass));
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--border);
   border-radius: 14px;
   padding: 18px 20px;
   box-shadow: var(--card-glow);
-  transition: transform .25s, box-shadow .25s;
+  transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
 }
@@ -245,7 +247,9 @@
 
 /* ── Chart panels ── */
 .chart-panel {
-  background: linear-gradient(135deg, var(--surface), var(--bg2));
+  background: linear-gradient(135deg, var(--surface-glass), var(--bg2-glass));
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--border);
   border-radius: 18px;
   padding: 24px;
@@ -319,7 +323,9 @@
 
 /* ── Data table ── */
 .table-panel {
-  background: linear-gradient(135deg, var(--surface), var(--bg2));
+  background: linear-gradient(135deg, var(--surface-glass), var(--bg2-glass));
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--border);
   border-radius: 18px;
   padding: 24px;
@@ -448,7 +454,7 @@
   font-family: 'Orbitron', monospace;
   font-size: 10px;
   cursor: pointer;
-  transition: all .2s;
+  transition: all 0.3s ease;
 }
 
 .pg-btn:hover,
