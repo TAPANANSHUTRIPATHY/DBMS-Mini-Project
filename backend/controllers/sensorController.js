@@ -35,18 +35,18 @@ exports.getHistory = async (req, res) => {
     let result;
 
     if (req.query.date) {
-      // Filter by specific date in SQL — only ~288 rows transferred instead of 100,000+
+      // Calculate exactly a 24-hour block based on IST (so 9 PM local aligns correctly without losing 12 AM ➜ 5:30 AM data)
       result = await pool.query(
         `SELECT * FROM sensor_data
-         WHERE created_at::date = $1::date
+         WHERE created_at >= ($1::date AT TIME ZONE 'Asia/Kolkata')
+           AND created_at <  (($1::date + interval '1 day') AT TIME ZONE 'Asia/Kolkata')
          ORDER BY created_at ASC`,
         [req.query.date]
       );
     } else {
-      // No date supplied — return last 500 rows as fallback
+      // No date — return all records (sorted)
       result = await pool.query(
-        `SELECT * FROM (SELECT * FROM sensor_data ORDER BY created_at DESC LIMIT 500) sub
-         ORDER BY created_at ASC`
+        `SELECT * FROM sensor_data ORDER BY created_at ASC`
       );
     }
 

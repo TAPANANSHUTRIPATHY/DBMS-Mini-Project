@@ -64,7 +64,9 @@ function localDate(isoStr) {
   return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
 }
 
-function fmtTime(isoStr) { return new Date(isoStr).toLocaleTimeString("en-GB"); }
+function fmtTime(isoStr) {
+  return new Date(isoStr).toLocaleTimeString("en-GB");
+}
 function fmtLong(dateStr) {
   return new Date(dateStr + "T12:00:00").toLocaleDateString("en-GB",
     { weekday: "long", year: "numeric", month: "long", day: "numeric" });
@@ -262,12 +264,16 @@ function update24hrChart(dateRows) {
   const aqiSlots = new Array(24).fill(null);
 
   dateRows.forEach(r => {
-    const hour = new Date(r.created_at).getHours();
+    const d = new Date(r.created_at);
+    // Use local browser hour so that 9 PM local time shows up exactly in the 21:00 bucket
+    const hour = d.getHours();
+
     const temp = parseFloat(r.temperature);
     const hum = parseFloat(r.humidity);
     const aqi = parseFloat(r.air_quality);
-    if (!isNaN(temp)) tempSlots[hour] = temp;
-    if (!isNaN(hum)) humSlots[hour] = hum;
+
+    if (!isNaN(temp) && temp !== 0) tempSlots[hour] = temp;
+    if (!isNaN(hum) && hum !== 0) humSlots[hour] = hum;
     if (!isNaN(aqi)) aqiSlots[hour] = aqi;
   });
 
@@ -311,16 +317,17 @@ function updateSummary(data) {
     setEl("scHealthGrade", "No data");
     return;
   }
-  const T = data.map(d => parseFloat(d.temperature));
-  const H = data.map(d => parseFloat(d.humidity));
-  const A = data.map(d => parseFloat(d.air_quality));
-  const S = data.map(d => healthScore(d.temperature, d.humidity, d.air_quality));
-  const avgS = Math.round(avg(S));
+  const T = data.map(d => parseFloat(d.temperature)).filter(v => !isNaN(v) && v !== 0);
+  const H = data.map(d => parseFloat(d.humidity)).filter(v => !isNaN(v) && v !== 0);
+  const A = data.map(d => parseFloat(d.air_quality)).filter(v => !isNaN(v));
+  const S = data.map(d => healthScore(d.temperature, d.humidity, d.air_quality))
+    .filter(v => v > 0);
+  const avgS = S.length ? Math.round(avg(S)) : 0;
 
-  setEl("scTempAvg", s1(avg(T)) + "°C"); setEl("scTempMin", s1(Math.min(...T))); setEl("scTempMax", s1(Math.max(...T))); setEl("scTempCount", data.length);
-  setEl("scHumAvg", s1(avg(H)) + "%"); setEl("scHumMin", s1(Math.min(...H))); setEl("scHumMax", s1(Math.max(...H))); setEl("scHumCount", data.length);
-  setEl("scAqiAvg", Math.round(avg(A))); setEl("scAqiMin", Math.round(Math.min(...A))); setEl("scAqiMax", Math.round(Math.max(...A))); setEl("scAqiCount", data.length);
-  setEl("scHealthVal", avgS); setEl("scHealthMin", Math.min(...S)); setEl("scHealthMax", Math.max(...S)); setEl("scTotalRecords", data.length);
+  setEl("scTempAvg", T.length ? s1(avg(T)) + "°C" : "--"); setEl("scTempMin", T.length ? s1(Math.min(...T)) : "--"); setEl("scTempMax", T.length ? s1(Math.max(...T)) : "--"); setEl("scTempCount", data.length);
+  setEl("scHumAvg", H.length ? s1(avg(H)) + "%" : "--"); setEl("scHumMin", H.length ? s1(Math.min(...H)) : "--"); setEl("scHumMax", H.length ? s1(Math.max(...H)) : "--"); setEl("scHumCount", data.length);
+  setEl("scAqiAvg", A.length ? Math.round(avg(A)) : "--"); setEl("scAqiMin", A.length ? Math.round(Math.min(...A)) : "--"); setEl("scAqiMax", A.length ? Math.round(Math.max(...A)) : "--"); setEl("scAqiCount", data.length);
+  setEl("scHealthVal", avgS); setEl("scHealthMin", S.length ? Math.min(...S) : "--"); setEl("scHealthMax", S.length ? Math.max(...S) : "--"); setEl("scTotalRecords", data.length);
 
   const grade = avgS >= 80 ? "EXCELLENT" : avgS >= 60 ? "GOOD" : avgS >= 40 ? "MODERATE" : "POOR";
   setEl("scHealthGrade", grade);
