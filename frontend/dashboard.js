@@ -45,6 +45,7 @@ let db24hrChart = null;
    RAW DATA CACHE  — avoid re-fetching within 60 s
 ================================================================ */
 let _cachedRaw = null;
+let _cachedDate = null;  /* date string the cache belongs to */
 let _cacheExpiry = 0;    /* epoch ms */
 const CACHE_TTL = 60000; /* 60 s */
 
@@ -219,64 +220,37 @@ document.addEventListener("DOMContentLoaded", () => {
    First successful response wins. Result is cached 60 s so
    date switching and silent auto-refresh never re-fetch.
 ================================================================ */
-async function fetchAllRecords() {
-  /* Return cached data if still fresh */
-  if (_cachedRaw && Date.now() < _cacheExpiry) {
-    console.log(`[ENVCORE] Using cached data (${_cachedRaw.length} rows)`);
+async function fetchAllRecords(dateStr) {
+  /* Return cached data if still fresh AND same date */
+  if (_cachedRaw && Date.now() < _cacheExpiry && _cachedDate === dateStr) {
+    console.log(`[ENVCORE] Using cached data (${_cachedRaw.length} rows) for ${dateStr}`);
     return _cachedRaw;
   }
 
   const timeout = ms => ({ signal: AbortSignal.timeout(ms) });
 
-  /* Race all strategies in parallel — first successful response wins */
-  const candidates = [
-    `${API_DB}/history?limit=100000`,
-    `${API_DB}/history?limit=100000&all=true`,
-    `${API_DB}/history?per_page=100000`,
-    `${API_DB}/history/all`,
-    `${API_DB}/history`,
-  ];
+  try {
+    // Send date to backend — SQL filters, only ~288 rows returned instead of 100,000+
+    const url = dateStr
+      ? `${API_DB}/history?date=${dateStr}`
+      : `${API_DB}/history`;
 
-  const tryUrl = async (url) => {
     const r = await fetch(url, timeout(12000));
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    const j = await r.json();
-    if (!Array.isArray(j) || j.length === 0) throw new Error("Empty response");
-    return j;
-  };
+    const raw = await r.json();
+    if (!Array.isArray(raw)) throw new Error("Invalid response");
 
-  try {
-    const raw = await Promise.any(candidates.map(tryUrl));
-    console.log(`[ENVCORE] Fetched ${raw.length} records.`);
+    console.log(`[ENVCORE] Fetched ${raw.length} records for ${dateStr}.`);
     _cachedRaw = raw;
+    _cachedDate = dateStr;
     _cacheExpiry = Date.now() + CACHE_TTL;
     return raw;
-  } catch (_) {
-    console.warn("[ENVCORE] All parallel strategies failed, falling back to pagination.");
+  } catch (err) {
+    console.error("[ENVCORE] fetchAllRecords error:", err);
+    return [];
   }
-
-  /* Last resort — paginate /api/history manually */
-  try {
-    let all = [], page = 1, perPage = 100;
-    while (page <= 200) {
-      const r = await fetch(`${API_DB}/history?page=${page}&per_page=${perPage}`, timeout(8000));
-      if (!r.ok) break;
-      const j = await r.json();
-      const rows = Array.isArray(j) ? j : (Array.isArray(j.data) ? j.data : []);
-      if (!rows.length) break;
-      all = all.concat(rows);
-      if (rows.length < perPage) break;
-      page++;
-    }
-    if (all.length) {
-      _cachedRaw = all;
-      _cacheExpiry = Date.now() + CACHE_TTL;
-      return all;
-    }
-  } catch (_) { }
-
-  return [];
 }
+
 
 /* ================================================================
    UPDATE 24HR MASTER CHART (date-aware hourly bucketing)
@@ -439,10 +413,8 @@ async function loadDate(dateStr, silent = false) {
   }
 
   try {
-    const all = await fetchAllRecords();
-    const data = all
-      .filter(d => localDate(d.created_at) === dateStr)
-      .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    // Backend now filters by date in SQL — no client-side filter needed
+    const data = await fetchAllRecords(dateStr);
 
     console.log(`[ENVCORE] Records for ${dateStr}: ${data.length}`);
     allData = data;
