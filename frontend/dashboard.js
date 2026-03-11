@@ -151,6 +151,13 @@ function build24hrChart(id) {
       datasets: [
         {
           label: "Temperature (°C)", borderColor: COLORS.temp,
+          segment: {
+            borderColor: ctx => {
+              if (!ctx.p0 || !ctx.p1) return COLORS.temp;
+              const y = ctx.p0.parsed.y;
+              return y >= 32 ? '#ff4d4d' : y >= 24 ? '#00ff88' : '#00e5ff';
+            }
+          },
           backgroundColor: rgba(COLORS.temp, 0.08),
           data: new Array(48).fill(null),
           tension: 0.4, pointRadius: 3, pointHoverRadius: 6,
@@ -165,6 +172,13 @@ function build24hrChart(id) {
         },
         {
           label: "Air Quality Index", borderColor: COLORS.aqi,
+          segment: {
+            borderColor: ctx => {
+              if (!ctx.p0 || !ctx.p1) return COLORS.aqi;
+              const y = ctx.p0.parsed.y;
+              return y >= 100 ? '#ff4d4d' : y >= 60 ? '#ffcc00' : '#00ff88';
+            }
+          },
           backgroundColor: rgba(COLORS.aqi, 0.08),
           data: new Array(48).fill(null),
           tension: 0.4, pointRadius: 3, pointHoverRadius: 6,
@@ -485,6 +499,42 @@ document.addEventListener("DOMContentLoaded", () => {
     a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
     a.download = `exports/${fname}`; document.body.appendChild(a); a.click();
     document.body.removeChild(a);
+  });
+
+  document.getElementById("pdfBtn")?.addEventListener("click", () => {
+    if (!allData.length) { alert("No data for this date."); return; }
+    const exportArea = document.querySelector(".db-wrap");
+    const actions = document.querySelector(".date-bar-right");
+    actions.style.display = "none";
+
+    // Set export button to loading state
+    const pdfBtn = document.getElementById("pdfBtn");
+    const origText = pdfBtn.innerHTML;
+    pdfBtn.innerHTML = "Generating...";
+
+    html2canvas(exportArea, { scale: 1.5, backgroundColor: "#06101e", useCORS: true }).then(canvas => {
+      actions.style.display = "flex";
+      pdfBtn.innerHTML = origText;
+
+      const imgData = canvas.toDataURL("image/jpeg", 0.95);
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF("p", "mm", "a4");
+
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+      // Add a header
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(16);
+      pdf.text(`ENVCORE Dashboard Report: ${selectedDate}`, 15, 15);
+
+      pdf.addImage(imgData, "JPEG", 5, 25, pdfWidth - 10, pdfHeight);
+      pdf.save(`ENVCORE_Report_${selectedDate}.pdf`);
+    }).catch(err => {
+      actions.style.display = "flex";
+      pdfBtn.innerHTML = origText;
+      console.error("PDF generation failed", err);
+    });
   });
 
   /* ── Date Picker ── */
