@@ -267,11 +267,6 @@ function update24hrChart(dateRows) {
     const d = new Date(r.created_at);
     const hour = d.getHours();
 
-    // Check if the record actually belongs to the selected local date
-    // Because backend returns 5:30 excess records for UTC crossover
-    const localDateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    if (localDateStr !== selectedDate) return;
-
     const temp = parseFloat(r.temperature);
     const hum = parseFloat(r.humidity);
     const aqi = parseFloat(r.air_quality);
