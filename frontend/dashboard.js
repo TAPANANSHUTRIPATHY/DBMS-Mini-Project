@@ -64,7 +64,9 @@ function localDate(isoStr) {
   return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
 }
 
-function fmtTime(isoStr) { return new Date(isoStr).toLocaleTimeString("en-GB"); }
+function fmtTime(isoStr) {
+  return new Date(isoStr).toLocaleTimeString("en-GB");
+}
 function fmtLong(dateStr) {
   return new Date(dateStr + "T12:00:00").toLocaleDateString("en-GB",
     { weekday: "long", year: "numeric", month: "long", day: "numeric" });
@@ -262,9 +264,8 @@ function update24hrChart(dateRows) {
   const aqiSlots = new Array(24).fill(null);
 
   dateRows.forEach(r => {
-    // Get the hour in the local time zone (IST if the user is in IST)
-    // The Date object automatically converts the UTC timestamp to local time
     const d = new Date(r.created_at);
+    // Use local browser hour so that 9 PM local time shows up exactly in the 21:00 bucket
     const hour = d.getHours();
 
     const temp = parseFloat(r.temperature);

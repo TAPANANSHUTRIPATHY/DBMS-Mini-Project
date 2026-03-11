@@ -35,10 +35,11 @@ exports.getHistory = async (req, res) => {
     let result;
 
     if (req.query.date) {
-      // Simplest date match, corresponds exactly to Neon SQL: WHERE DATE(created_at) = 'YYYY-MM-DD'
+      // Calculate exactly a 24-hour block based on IST (so 9 PM local aligns correctly without losing 12 AM ➜ 5:30 AM data)
       result = await pool.query(
         `SELECT * FROM sensor_data
-         WHERE DATE(created_at) = $1
+         WHERE created_at >= ($1::date AT TIME ZONE 'Asia/Kolkata')
+           AND created_at <  (($1::date + interval '1 day') AT TIME ZONE 'Asia/Kolkata')
          ORDER BY created_at ASC`,
         [req.query.date]
       );
