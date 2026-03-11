@@ -313,16 +313,17 @@ function updateSummary(data) {
     setEl("scHealthGrade", "No data");
     return;
   }
-  const T = data.map(d => parseFloat(d.temperature));
-  const H = data.map(d => parseFloat(d.humidity));
-  const A = data.map(d => parseFloat(d.air_quality));
-  const S = data.map(d => healthScore(d.temperature, d.humidity, d.air_quality));
-  const avgS = Math.round(avg(S));
+  const T = data.map(d => parseFloat(d.temperature)).filter(v => !isNaN(v) && v !== 0);
+  const H = data.map(d => parseFloat(d.humidity)).filter(v => !isNaN(v) && v !== 0);
+  const A = data.map(d => parseFloat(d.air_quality)).filter(v => !isNaN(v));
+  const S = data.map(d => healthScore(d.temperature, d.humidity, d.air_quality))
+    .filter(v => v > 0);
+  const avgS = S.length ? Math.round(avg(S)) : 0;
 
-  setEl("scTempAvg", s1(avg(T)) + "°C"); setEl("scTempMin", s1(Math.min(...T))); setEl("scTempMax", s1(Math.max(...T))); setEl("scTempCount", data.length);
-  setEl("scHumAvg", s1(avg(H)) + "%"); setEl("scHumMin", s1(Math.min(...H))); setEl("scHumMax", s1(Math.max(...H))); setEl("scHumCount", data.length);
-  setEl("scAqiAvg", Math.round(avg(A))); setEl("scAqiMin", Math.round(Math.min(...A))); setEl("scAqiMax", Math.round(Math.max(...A))); setEl("scAqiCount", data.length);
-  setEl("scHealthVal", avgS); setEl("scHealthMin", Math.min(...S)); setEl("scHealthMax", Math.max(...S)); setEl("scTotalRecords", data.length);
+  setEl("scTempAvg", T.length ? s1(avg(T)) + "°C" : "--"); setEl("scTempMin", T.length ? s1(Math.min(...T)) : "--"); setEl("scTempMax", T.length ? s1(Math.max(...T)) : "--"); setEl("scTempCount", data.length);
+  setEl("scHumAvg", H.length ? s1(avg(H)) + "%" : "--"); setEl("scHumMin", H.length ? s1(Math.min(...H)) : "--"); setEl("scHumMax", H.length ? s1(Math.max(...H)) : "--"); setEl("scHumCount", data.length);
+  setEl("scAqiAvg", A.length ? Math.round(avg(A)) : "--"); setEl("scAqiMin", A.length ? Math.round(Math.min(...A)) : "--"); setEl("scAqiMax", A.length ? Math.round(Math.max(...A)) : "--"); setEl("scAqiCount", data.length);
+  setEl("scHealthVal", avgS); setEl("scHealthMin", S.length ? Math.min(...S) : "--"); setEl("scHealthMax", S.length ? Math.max(...S) : "--"); setEl("scTotalRecords", data.length);
 
   const grade = avgS >= 80 ? "EXCELLENT" : avgS >= 60 ? "GOOD" : avgS >= 40 ? "MODERATE" : "POOR";
   setEl("scHealthGrade", grade);
