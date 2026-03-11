@@ -53,30 +53,27 @@ This project demonstrates end-to-end engineering across:
 
 ### Live Monitor — Smart Environmental Monitoring
 
-> Real-time sensor dashboard with live data streaming from ESP32 via the cloud.
+> Real-time sensor dashboard with live data streaming from ESP32 via the cloud, paired with advanced metric visualizations.
 
 ![ENVCORE Live Monitor](screenshots/envcore-live-monitor.png)
 
 **UI Highlights:**
-- 📍 **Location bar** — Shows *"Bhubaneswar Municipal Corporation, Odisha, India"* auto-detected
-- 🟢 **LIVE indicator** — Pulsing green dot with real-time clock (HH:MM:SS)
-- ⚠️ **Smart AQI Alert Banner** — Yellow warning bar: *"Air quality MODERATE: AQI 1091"*
-- 🎯 **Health Score Gauge** — Circular donut gauge (score: **75 — GOOD**) with color-coded segments for Temperature, Humidity, and Air Quality
+- 📍 **Weather Information Ticker** — Scrolling banner with auto-detected weather: *"Bhubaneswar • Clear sky • Temp: 24.7°C (Feels 29.1°C) • Humidity: 84% • Wind: 3 km/h • UV: 0.0 • Sensor AQI: 165 – Unhealthy"*
+- 🟢 **System Status Bar** — Shows Device Status (Online/Offline), Last Data sync timestamp, and Internet connection quality
+- 🎯 **Health Score Gauge** — Circular donut gauge (score: **65 — GOOD**) with color-coded segments for Temperature, Humidity, and Air Quality
 - 🃏 **Sensor Reading Cards** (3 interactive cards):
-  - 🌡️ Temperature: **28.3°C** with min/avg/max + sparkline trend chart
-  - 💧 Humidity: **43.8%** with min/avg/max + sparkline trend chart
-  - 🌫️ Air Quality Index: **1101 — Moderate** (highlighted with yellow glow border) with min/avg/max
-- 📈 **Real-Time Analytics** section with 3 live Chart.js time-series graphs:
-  - Temperature over time (red fill area)
-  - Humidity over time (cyan fill area)
-  - Air Quality Index over time (green fill area)
-- 🎛️ **Sensor Gauges** — 3 arc-style gauges at the bottom for Temperature, Humidity, and AQI with color coding
+  - 🌡️ Temperature: Live value with min/avg/max details + trend visualization
+  - 💧 Humidity: Live value with min/avg/max details + trend visualization
+  - 🌫️ Air Quality Index: Live value with min/avg/max details + categorized status (e.g., Unhealthy)
+- 📈 **Today's Master Graph (00:00 - 23:59)** — Combined 24-hour predictive and historical overlap chart for all 3 metrics with dynamic line rendering
+- � **Real-Time Analytics** — 3 live time-series graphs tracking immediate sensor state fluctuations and temporary offline gaps
+- 📅 **Last 7 Days (Daily Average)** — 3 smooth line charts showing week-long trend analysis for Temperature, Humidity, and AQI
 
 ---
 
 ### Historical Data Dashboard
 
-> Full historical analysis with date filtering, detailed data table, and CSV export.
+> Full historical analysis with date filtering, granular timeline visualization, and comprehensive data extrapolation.
 
 ![ENVCORE Historical Dashboard](screenshots/envcore-historical-dashboard.png)
 
@@ -84,14 +81,28 @@ This project demonstrates end-to-end engineering across:
 - 📅 **Date Filter Bar** — View by Today / Yesterday / 3 Days Ago with a custom date picker
 - 📤 **Download CSV** button for exporting all historical records
 - 📊 **4 Summary Cards** at the top:
-  - 🌡️ Temperature: **27.5°C** avg with min/max/timestamp
-  - 💧 Humidity: **56.3%** avg with min/max/timestamp
-  - 🌫️ Air Quality Index: **1454** avg with min/max/timestamp
-  - 💚 ENV Health Score: **72** — GOOD
-- 📈 **Temperature Over Time** graph (red)
-- 📈 **Humidity Over Time** graph (cyan)
-- 📈 **Air Quality Index Over Time** graph (green) — full width, clearly showing AQI drop from ~6000 → stabilizing ~1400 over time
-- 📋 **Detailed Records Table** — Paginated (Page 1 of 5, showing 1–50 of **396 records**) with columns: `#`, `Time`, `Temperature`, `Humidity`, `Air Quality`, `Health Score` with color-coded AQI badges: 🔴 Poor / 🟡 Moderate / 🟢 Good
+  - 🌡️ Temperature: Average with min/max bounds
+  - 💧 Humidity: Average with min/max bounds
+  - 🌫️ Air Quality Index: Average with min/max bounds
+  - 💚 ENV Health Score: Composite score out of 100
+- 📈 **Full Day - 24HR Master Graph** — Comprehensive overlap of Temperature, Humidity, and AQI over a full day
+- 📈 **Metric-Specific Over Time Graphs** — Area/line charts tracking Temperature, Humidity, and AQI specifically across the full timeline
+- � **Detailed Records Table** — Paginated component showing every single recorded timestamp, matching specific readings and health scores with color-coded AQI badges
+
+---
+
+### Alert System & Configuration
+
+> Fully customizable front-end alert triggering configuration without full backend reliance.
+
+![ENVCORE Alert System](screenshots/envcore-alert.png)
+
+**UI Highlights:**
+- � **Live AQI Monitor** — Displays current active AQI and visual threshold limit
+- ⚙️ **AQI Alert Threshold Config** — Quick preset options (100, 120, 150, 200) and custom inputs to define alert trigger values
+- 📧 **Email Alerts Settings** — Fully editable email subject and rich body templates with dynamic placeholders like `{aqi}`, `{threshold}`, `{level}`, and `{time}`
+- 📱 **SMS Alerts Settings** — Configurable direct SMS alerts routing via cellular provider email gateways
+- � **Alert History Panel** — Scrollable history log storing timestamped threshold breach events with quick clear capability
 
 ---
 
@@ -137,28 +148,30 @@ This project demonstrates end-to-end engineering across:
 DBMS-Mini-Project/
 │
 ├── backend/                    # ✅ Production backend (deployed on Render)
-│   ├── backendespcode/
-│   ├── controllers/
-│   ├── routes/
-│   ├── node_modules/
-│   ├── .env
-│   ├── db.js
-│   ├── server.js
-│   ├── server-postman.js
-│   ├── package.json
-│   └── package-lock.json
+│   ├── backendespcode/         # Original ESP32 backend iteration
+│   │     └── backendespcode.ino
+│   ├── backendespcode_updated/ # Updated and enhanced ESP32 code logic
+│   │     └── backendespcode_updated.ino
+│   ├── controllers/            # Route handler logic and DB controls
+│   ├── ESP32_WeatherStation_WiFi_Supabase_Uploader/ # Direct ESP32 to Supabase DB uploader script
+│   │     └── ESP32_WeatherStation_WiFi_Supabase_Uploader.ino
+│   ├── routes/                 # Express API endpoint definitions
+│   ├── node_modules/           # Node.js dependencies
+│   ├── .env                    # Environment variables (DB URL, Port)
+│   ├── db.js                   # Database connection helper
+│   ├── server.js               # Main Express server entry point
+│   ├── server-postman.js       # Specialized server for Postman testing
+│   ├── package.json            # NPM project configuration
+│   └── package-lock.json       # Dependency tree lock
 │
 ├── backend-test/               # 🧪 Phase 1 isolated test environment
-│   ├── server-test.js
-│   ├── db-test.js
-│   ├── routes/
-│   │     └── sensorRoutes-test.js
-│   ├── controllers/
-│   │     └── sensorController-test.js
+│   ├── backend_esp_code_test/  # Test iterations of ESP32 connection code
+│   │     └── backend_esp_code.ino
+│   ├── server-test.js          # Entry point for isolated testing
+│   ├── db-test.js              # Connection to test PostgreSQL database
+│   ├── routes/                 # Testing environment routes
+│   ├── controllers/            # Testing environment controllers
 │   └── results/                # 📸 pgAdmin database verification screenshots
-│       ├── pg_admin_backend_test_DHT_11_temperature_graph.png
-│       ├── pg_admin_backend_test_DHT_11_humidity_graph.png
-│       └── pg_admin_backend_test_MQ135_air_quality_graph.png
 │
 ├── CSV Files/                  # 📊 Exported sensor data CSV files
 ├── Database Scripts/           # 🗄️ SQL scripts for schema setup
@@ -167,43 +180,29 @@ DBMS-Mini-Project/
 ├── ESP 32 Codes/               # 🔌 All ESP32 Arduino sketches
 │
 ├── frontend/                   # 🎨 Netlify deployed dashboard
-│   ├── charts.js
-│   ├── dashboard.css
+│   ├── alerts.html             # SMS & Email alerts config page
+│   ├── alerts.js               # Global alert checking logic
+│   ├── alerts-page.js          # Settings & API configuration logic
+│   ├── alerts-page.css         # Styling for alerts page
+│   ├── assets/                 # Icons and image assets
+│   ├── charts.js               # Chart.js initialization and updates
+│   ├── dashboard.css           # Styling for historical dashboard
 │   ├── dashboard.html          # Historical data dashboard page
-│   ├── dashboard.js
+│   ├── dashboard.js            # Historical data fetching logic
+│   ├── forecast.js             # 24-hour predictive/historical charts
 │   ├── index.html              # Live monitor page
-│   ├── script.js
-│   └── style.css
+│   ├── location.js             # Location detection & Geocoding logic
+│   ├── script.js               # Live data polling and main UI logic
+│   └── style.css               # Main styling for live dashboard
 │
 ├── Research Papers/            # 📚 Reference research papers
 │
 ├── screenshots/                # 📸 UI screenshots (used in this README)
-│   ├── envcore-live-monitor.png
-│   └── envcore-historical-dashboard.png
 │
 ├── .gitattributes
 ├── LICENSE
 └── README.md
 ```
-
----
-
-## 🌿 Branch Structure
-
-The project follows a structured **phase-based branching strategy**, with each branch representing a traceable development milestone:
-
-| Branch | Last Updated | PR | Description |
-|--------|-------------|-----|-------------|
-| `phase-8-netlify-frontend-integration` | 20 hours ago | #5 | Final Netlify deployment + frontend polish |
-| `phase-7-render-backend-integration` | Yesterday | — | Render cloud backend deployment |
-| `phase-6-cloud-integration-and-deployment` | Yesterday | — | Full cloud stack integration |
-| `phase-5-final-ui-update` | Yesterday | #4 | Final UI improvements and refinements |
-| `phase-4-backend-integration` | 2 days ago | #2 | Production backend setup and integration |
-| `phase-3-UI-Part2` | 2 days ago | — | Frontend UI Part 2 development |
-| `phase-2-UI-Update` | 2 days ago | — | Frontend UI initial update |
-| `phase-1-backend-test` | 2 days ago | — | Backend test and database validation |
-
-> **Branching convention:** Each branch maps 1:1 to a project phase, making the full development history traceable and reviewable via GitHub pull requests.
 
 ---
 
@@ -345,6 +344,25 @@ Full Render backend + Netlify deployment with confirmed live data flow, polished
 
 ---
 
+### 🟢 Phase 9 — Frontend Optimization & Localization
+
+Focused on highly improving data loading speeds, graph visualization, localization, and dashboard robustness.
+- **24-Hour Master Chart:** Pinned a fixed `00:00–23:00` axis where missing records render accurately as line gaps (`spanGaps: false`). Removed chart animation delays for instant rendering.
+- **Parallel Fetch & Caching:** Routed around API latency by racing endpoints (`Promise.any()`) and caching raw data for 60 seconds, preventing redundant network calls when switching dates or auto-refreshing.
+- **Keyless Geocoding API:** Migrated from Google Maps to totally free APIs using Photon (OSM) for location autocomplete and BigDataCloud for precise reverse-geocoding without API keys.
+- **Offline Resilience:** Increased the online/offline connection threshold to 6 minutes. Ensured that during temporary device offline states, the dashboard retains and displays the last known sensor data rather than clearing to empty states (`--`).
+- **Data Continuity in Graphs:** Fixed chart rendering logic so data lines remain continuous and do not vanish when new data points are temporarily unavailable.
+- **UI/UX Enhancements:** Removed the unused battery status display and optimized layout spacing. Eliminated flickering issues in the news ticker to ensure a smooth, professional data stream.
+
+---
+
+### 🟢 Phase 10 — Serverless Alerting System (Email & SMS)
+
+Allows users to receive direct notifications for bad AQI thresholds purely via the frontend, avoiding backend mailing infrastructure.
+- **EmailJS Integration:** Built a fully client-side alerting framework hooking into `EmailJS`, dynamically passing customized text blocks (`{{aqi}}`, `{{threshold}}`) whenever the dashboard picks up hazardous spikes.
+- **SMS Gateway Routing [Testing]:** Overcame global CORS limits and restrictive third-party REST APIs by routing free SMS alerts through standard mobile carrier email-to-SMS gateways straight from the browser.
+
+---
 ## 📡 Production API Endpoints
 
 | Method | Endpoint | Description |
@@ -480,9 +498,18 @@ Wait 5 Seconds → LOOP ↑
 | 🟢 Phase 4 | Production Backend | ✅ Complete |
 | 🟢 Phase 5–6 | Cloud Deployment | ✅ Complete |
 | 🟢 Phase 7–8 | Frontend + Netlify Integration | ✅ Complete |
-| 🟢 Phase 9 | Frontend Improvements & Sensor Calibrations | On Progress |
-| 🟡 Phase 10 | SMS & Email Facility Integration | 🔄 Planned |
-| 🟡 Phase 11 | Advanced Analytics & ML | 🔄 Planned |
+| 🟢 Phase 9 | Frontend Improvements & Sensor Calibrations | ✅ Complete |
+| 🟢 Phase 10 | SMS (under testing phase) & Email Facility Integration | ✅ Complete |
+| � Phase 11 | User Authentication & Role-Based Access + Dashboard UI Revamp | 🔄 Planned |
+| 🟡 Phase 12 | Advanced Data Analytics & Reporting + Interactive Charting Upgrade | 🔄 Planned |
+| 🟡 Phase 13 | Multi-Sensor Node Support (Scaling) + Map View Integration | 🔄 Planned |
+| 🟡 Phase 14 | Predictive ML Model for AQI Forecasting + Forecast Trend Visuals | 🔄 Planned |
+| 🟡 Phase 15 | MQTT Protocol Migration for IoT Messaging + Real-Time UI Sync Optimization | 🔄 Planned |
+| 🟡 Phase 16 | Web & App Push Notifications for AQI Alerts + Notification Center UI | 🔄 Planned |
+| 🟡 Phase 17 | Mobile Application (React Native / Flutter) + Responsive Layout Refinements | 🔄 Planned |
+| 🟡 Phase 18 | Admin Dashboard for Device Management + Admin Control Panel UI | 🔄 Planned |
+| 🟡 Phase 19 | Edge Computing Layer & Offline Data Sync + Offline Mode Indicators | 🔄 Planned |
+| 🟡 Phase 20 | Full CI/CD Pipeline & Automated Testing + Accessibility (a11y) Improvements | 🔄 Planned |
 
 ---
 
@@ -503,6 +530,9 @@ Wait 5 Seconds → LOOP ↑
 **Tapananshu Tripathy**
 B.Tech — Computer Science & Engineering
 KIIT University, Bhubaneswar, Odisha
+
+**Under the Supervision of:**
+**Prof. Vijay Kumar Meena**
 
 ---
 
