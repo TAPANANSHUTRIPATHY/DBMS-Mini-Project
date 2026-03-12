@@ -36,10 +36,11 @@ exports.getHistory = async (req, res) => {
 
     if (req.query.date) {
       // Calculate exactly a 24-hour block based on IST (so 9 PM local aligns correctly without losing 12 AM ➜ 5:30 AM data)
+      // Since created_at stores UTC as timestamp without timezone, shift the local date boundaries backwards by 5h 30m
       result = await pool.query(
         `SELECT * FROM sensor_data
-         WHERE created_at >= ($1::date AT TIME ZONE 'Asia/Kolkata')
-           AND created_at <  (($1::date + interval '1 day') AT TIME ZONE 'Asia/Kolkata')
+         WHERE created_at >= ($1::date - interval '5 hours 30 minutes')
+           AND created_at <  ($1::date + interval '1 day' - interval '5 hours 30 minutes')
          ORDER BY created_at ASC`,
         [req.query.date]
       );
