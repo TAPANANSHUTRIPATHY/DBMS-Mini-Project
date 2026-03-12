@@ -61,11 +61,11 @@ This project demonstrates end-to-end engineering across:
 - 📍 **Weather Information Ticker** — Scrolling banner with auto-detected weather: *"Bhubaneswar • Clear sky • Temp: 24.7°C (Feels 29.1°C) • Humidity: 84% • Wind: 3 km/h • UV: 0.0 • Sensor AQI: 165 – Unhealthy"*
 - 🟢 **System Status Bar** — Shows Device Status (Online/Offline), Last Data sync timestamp, and Internet connection quality
 - 🎯 **Health Score Gauge** — Circular donut gauge (score: **65 — GOOD**) with color-coded segments for Temperature, Humidity, and Air Quality
-- 🃏 **Sensor Reading Cards** (3 interactive cards):
+- 🃏 **Sensor Reading Cards** (3 interactive **glassmorphism** cards):
   - 🌡️ Temperature: Live value with min/avg/max details + trend visualization
   - 💧 Humidity: Live value with min/avg/max details + trend visualization
   - 🌫️ Air Quality Index: Live value with min/avg/max details + categorized status (e.g., Unhealthy)
-- 📈 **Today's Master Graph (00:00 - 23:59)** — Combined 24-hour predictive and historical overlap chart for all 3 metrics with dynamic line rendering
+- 📈 **Today's Master Graph (00:00 - 23:59)** — Combined 24-hour predictive and historical overlap chart for all 3 metrics with clean, single-color line rendering
 - � **Real-Time Analytics** — 3 live time-series graphs tracking immediate sensor state fluctuations and temporary offline gaps
 - 📅 **Last 7 Days (Daily Average)** — 3 smooth line charts showing week-long trend analysis for Temperature, Humidity, and AQI
 
@@ -98,11 +98,11 @@ This project demonstrates end-to-end engineering across:
 ![ENVCORE Alert System](screenshots/envcore-alert.png)
 
 **UI Highlights:**
-- � **Live AQI Monitor** — Displays current active AQI and visual threshold limit
+-  **Live AQI Monitor** — Displays current active AQI and visual threshold limit with a **glassmorphism** banner
 - ⚙️ **AQI Alert Threshold Config** — Quick preset options (100, 120, 150, 200) and custom inputs to define alert trigger values
 - 📧 **Email Alerts Settings** — Fully editable email subject and rich body templates with dynamic placeholders like `{aqi}`, `{threshold}`, `{level}`, and `{time}`
 - 📱 **SMS Alerts Settings** — Configurable direct SMS alerts routing via cellular provider email gateways
-- � **Alert History Panel** — Scrollable history log storing timestamped threshold breach events with quick clear capability
+-  **Alert History Panel** — Scrollable history log storing timestamped threshold breach events with quick clear capability, styled with **glassmorphism** cards
 
 ---
 
@@ -351,8 +351,8 @@ Focused on highly improving data loading speeds, graph visualization, localizati
 - **Parallel Fetch & Caching:** Routed around API latency by racing endpoints (`Promise.any()`) and caching raw data for 60 seconds, preventing redundant network calls when switching dates or auto-refreshing.
 - **Keyless Geocoding API:** Migrated from Google Maps to totally free APIs using Photon (OSM) for location autocomplete and BigDataCloud for precise reverse-geocoding without API keys.
 - **Offline Resilience:** Increased the online/offline connection threshold to 6 minutes. Ensured that during temporary device offline states, the dashboard retains and displays the last known sensor data rather than clearing to empty states (`--`).
-- **Data Continuity in Graphs:** Fixed chart rendering logic so data lines remain continuous and do not vanish when new data points are temporarily unavailable.
-- **UI/UX Enhancements:** Removed the unused battery status display and optimized layout spacing. Eliminated flickering issues in the news ticker to ensure a smooth, professional data stream.
+- **Data Continuity in Graphs:** Fixed chart rendering logic so data lines remain continuous and do not vanish when new data points are temporarily unavailable. Master graph lines restored to clean, single-color aesthetics.
+- **UI/UX Enhancements:** Implemented **premium glassmorphism** styling across dashboard cards, alert panels, and the AQI banner. Removed the unused battery status display and optimized layout spacing. Eliminated flickering issues in the news ticker to ensure a smooth, professional data stream.
 
 ---
 
@@ -361,6 +361,23 @@ Focused on highly improving data loading speeds, graph visualization, localizati
 Allows users to receive direct notifications for bad AQI thresholds purely via the frontend, avoiding backend mailing infrastructure.
 - **EmailJS Integration:** Built a fully client-side alerting framework hooking into `EmailJS`, dynamically passing customized text blocks (`{{aqi}}`, `{{threshold}}`) whenever the dashboard picks up hazardous spikes.
 - **SMS Gateway Routing [Testing]:** Overcame global CORS limits and restrictive third-party REST APIs by routing free SMS alerts through standard mobile carrier email-to-SMS gateways straight from the browser.
+
+---
+
+### 🟢 Phase 11 — Database Migration & Backend Redeployment (NeonDB)
+
+Migrated the primary PostgreSQL database infrastructure to NeonDB to avoid Supabase's restrictive egress limits and optimize connection pooling, serverless scaling, and backend reliability.
+- **NeonDB Integration:** Replaced the previous Supabase connection strings with NeonDB serverless PostgreSQL. This solved the persistent "egress limit exhausted" issue experienced under high continuous data loads.
+- **Backend Redeployment:** Reconfigured and redeployed the Node.js backend on Render to seamlessly synchronize with the new NeonDB architecture without downtime.
+
+---
+
+### 🟢 Phase 12 — Advanced UI Enhancements & Feature Additions
+
+Focused on polishing the dashboard user experience with premium aesthetics and refined data interactions.
+- **Glassmorphism Design:** Implemented modern, premium glassmorphism styling across all sensor cards, the Live AQI banner, and the Alert History panel.
+- **Master Graph Refinement:** Restored the 24-hour predictive and historical overlap chart to use clean, single-color line rendering for improved readability.
+- **PDF Export Optimization:** Enhanced the "Export PDF" functionality to intelligently capture only the graphical charts and summary cards, automatically excluding the raw data tables.
 
 ---
 ## 📡 Production API Endpoints
@@ -453,26 +470,19 @@ Wait 5 Seconds → LOOP ↑
 | Scenario | Handling Strategy |
 |----------|------------------|
 | WiFi Disconnection | Auto-reconnect logic on ESP32 |
-| HTTP Error Response | Validation + retry mechanism |
-| Backend Cold Start | Cold start delay handling |
-| CORS Issues | Configured CORS middleware |
-| Secret Exposure | Environment variables via `.env` + Render secrets |
-
----
-
-## 🚀 Final Deployment Architecture
-
-```
-┌──────────────────────────────────────────────────┐
-│  Netlify  — Frontend Dashboard                   │
-│  https://envcore-dashboard-dbms-tt.netlify.app   │
-└───────────────────┬──────────────────────────────┘
-                    │  REST API (HTTPS)
-                    ▼
-┌──────────────────────────────────────────────────┐
-│  Render  — Node.js Backend                       │
-│  https://your-api.onrender.com                   │
-└───────────────────┬──────────────────────────────┘
+| HTTP Error | 🟢 Phase 10 | SMS (under testing phase) & Email Facility Integration | ✅ Complete |
+| 🟢 Phase 11 | NeonDB Migration (Fix Egress Limit) & Backend Redeploy | ✅ Complete |
+| 🟢 Phase 12 | Advanced UI Enhancements (Glassmorphism) & Feature Additions | ✅ Complete |
+| 🟡 Phase 13 | User Authentication & Role-Based Access + Dashboard UI Revamp | 🔄 Planned |
+| 🟡 Phase 14 | Advanced Data Analytics & Reporting + Interactive Charting Upgrade | 🔄 Planned |
+| 🟡 Phase 15 | Multi-Sensor Node Support (Scaling) + Map View Integration | 🔄 Planned |
+| 🟡 Phase 16 | Predictive ML Model for AQI Forecasting + Forecast Trend Visuals | 🔄 Planned |
+| 🟡 Phase 17 | MQTT Protocol Migration for IoT Messaging + Real-Time UI Sync Optimization | 🔄 Planned |
+| 🟡 Phase 18 | Web & App Push Notifications for AQI Alerts + Notification Center UI | 🔄 Planned |
+| 🟡 Phase 19 | Mobile Application (React Native / Flutter) + Responsive Layout Refinements | 🔄 Planned |
+| 🟡 Phase 20 | Admin Dashboard for Device Management + Admin Control Panel UI | 🔄 Planned |
+| 🟡 Phase 21 | Edge Computing Layer & Offline Data Sync + Offline Mode Indicators | 🔄 Planned |
+| 🟡 Phase 22 | Full CI/CD Pipeline & Automated Testing + Accessibility (a11y) Improvements | 🔄 Planned |��──────────────┬──────────────────────────────┘
                     │  SQL (pg driver)
                     ▼
 ┌──────────────────────────────────────────────────┐
