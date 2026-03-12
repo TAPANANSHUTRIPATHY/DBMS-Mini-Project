@@ -33,9 +33,9 @@ This project demonstrates end-to-end engineering across:
 |--------|-------|
 | Embedded Systems | ESP32, DHT11, MQ135 |
 | Backend API | Node.js, Express.js |
-| Database | PostgreSQL (Supabase Cloud) |
+| Database | PostgreSQL (NeonDB Serverless) |
 | Frontend | HTML5, CSS3, Chart.js |
-| DevOps | Render, Netlify, Supabase |
+| DevOps | Render, Netlify, NeonDB |
 
 ---
 
@@ -61,11 +61,11 @@ This project demonstrates end-to-end engineering across:
 - 📍 **Weather Information Ticker** — Scrolling banner with auto-detected weather: *"Bhubaneswar • Clear sky • Temp: 24.7°C (Feels 29.1°C) • Humidity: 84% • Wind: 3 km/h • UV: 0.0 • Sensor AQI: 165 – Unhealthy"*
 - 🟢 **System Status Bar** — Shows Device Status (Online/Offline), Last Data sync timestamp, and Internet connection quality
 - 🎯 **Health Score Gauge** — Circular donut gauge (score: **65 — GOOD**) with color-coded segments for Temperature, Humidity, and Air Quality
-- 🃏 **Sensor Reading Cards** (3 interactive cards):
+- 🃏 **Sensor Reading Cards** (3 interactive **glassmorphism** cards):
   - 🌡️ Temperature: Live value with min/avg/max details + trend visualization
   - 💧 Humidity: Live value with min/avg/max details + trend visualization
   - 🌫️ Air Quality Index: Live value with min/avg/max details + categorized status (e.g., Unhealthy)
-- 📈 **Today's Master Graph (00:00 - 23:59)** — Combined 24-hour predictive and historical overlap chart for all 3 metrics with dynamic line rendering
+- 📈 **Today's Master Graph (00:00 - 23:59)** — Combined 24-hour predictive and historical overlap chart for all 3 metrics with clean, single-color line rendering
 - � **Real-Time Analytics** — 3 live time-series graphs tracking immediate sensor state fluctuations and temporary offline gaps
 - 📅 **Last 7 Days (Daily Average)** — 3 smooth line charts showing week-long trend analysis for Temperature, Humidity, and AQI
 
@@ -98,11 +98,19 @@ This project demonstrates end-to-end engineering across:
 ![ENVCORE Alert System](screenshots/envcore-alert.png)
 
 **UI Highlights:**
-- � **Live AQI Monitor** — Displays current active AQI and visual threshold limit
+-  **Live AQI Monitor** — Displays current active AQI and visual threshold limit with a **glassmorphism** banner
 - ⚙️ **AQI Alert Threshold Config** — Quick preset options (100, 120, 150, 200) and custom inputs to define alert trigger values
 - 📧 **Email Alerts Settings** — Fully editable email subject and rich body templates with dynamic placeholders like `{aqi}`, `{threshold}`, `{level}`, and `{time}`
 - 📱 **SMS Alerts Settings** — Configurable direct SMS alerts routing via cellular provider email gateways
-- � **Alert History Panel** — Scrollable history log storing timestamped threshold breach events with quick clear capability
+-  **Alert History Panel** — Scrollable history log storing timestamped threshold breach events with quick clear capability, styled with **glassmorphism** cards
+
+#### 📧 Sample Alert Email — AQI Threshold Breach Notification
+
+> When the AQI crosses the configured threshold, an automated email is dispatched via EmailJS directly from the frontend. Below is a sample of the alert email received in the inbox:
+
+![ENVCORE Email Alert Sample](screenshots/Email-Alert.png)
+
+> *(Add screenshot of the actual alert email received in inbox here — e.g., `screenshots/envcore-email-alert.png`)*
 
 ---
 
@@ -129,8 +137,9 @@ This project demonstrates end-to-end engineering across:
                    │
                    ▼  SQL Queries
 ┌────────────────────────────────────────┐
-│        DATABASE (Supabase)             │
-│   PostgreSQL — Cloud Hosted            │
+│        DATABASE (NeonDB)               │
+│   PostgreSQL — Serverless Cloud        │
+│   (Migrated from Supabase — Phase 11)  │
 └──────────────────┬─────────────────────┘
                    │
                    ▼  REST API Fetch
@@ -351,8 +360,8 @@ Focused on highly improving data loading speeds, graph visualization, localizati
 - **Parallel Fetch & Caching:** Routed around API latency by racing endpoints (`Promise.any()`) and caching raw data for 60 seconds, preventing redundant network calls when switching dates or auto-refreshing.
 - **Keyless Geocoding API:** Migrated from Google Maps to totally free APIs using Photon (OSM) for location autocomplete and BigDataCloud for precise reverse-geocoding without API keys.
 - **Offline Resilience:** Increased the online/offline connection threshold to 6 minutes. Ensured that during temporary device offline states, the dashboard retains and displays the last known sensor data rather than clearing to empty states (`--`).
-- **Data Continuity in Graphs:** Fixed chart rendering logic so data lines remain continuous and do not vanish when new data points are temporarily unavailable.
-- **UI/UX Enhancements:** Removed the unused battery status display and optimized layout spacing. Eliminated flickering issues in the news ticker to ensure a smooth, professional data stream.
+- **Data Continuity in Graphs:** Fixed chart rendering logic so data lines remain continuous and do not vanish when new data points are temporarily unavailable. Master graph lines restored to clean, single-color aesthetics.
+- **UI/UX Enhancements:** Implemented **premium glassmorphism** styling across dashboard cards, alert panels, and the AQI banner. Removed the unused battery status display and optimized layout spacing. Eliminated flickering issues in the news ticker to ensure a smooth, professional data stream.
 
 ---
 
@@ -361,6 +370,63 @@ Focused on highly improving data loading speeds, graph visualization, localizati
 Allows users to receive direct notifications for bad AQI thresholds purely via the frontend, avoiding backend mailing infrastructure.
 - **EmailJS Integration:** Built a fully client-side alerting framework hooking into `EmailJS`, dynamically passing customized text blocks (`{{aqi}}`, `{{threshold}}`) whenever the dashboard picks up hazardous spikes.
 - **SMS Gateway Routing [Testing]:** Overcame global CORS limits and restrictive third-party REST APIs by routing free SMS alerts through standard mobile carrier email-to-SMS gateways straight from the browser.
+
+---
+
+### 🟢 Phase 11 — Database Migration & Backend Redeployment (NeonDB)
+
+Migrated the primary PostgreSQL database infrastructure to NeonDB to avoid Supabase's restrictive egress limits and optimize connection pooling, serverless scaling, and backend reliability.
+
+#### ⚠️ Why We Migrated Away from Supabase to NeonDB
+
+During Phase 10, the system was running on **Supabase's free-tier PostgreSQL**. As the ESP32 began posting sensor data every 5 seconds continuously, we hit a critical infrastructure wall:
+
+| Problem | Root Cause |
+|---------|-----------|
+| 🔴 **Egress Limit Exhausted** | Supabase free tier caps outbound data transfer. With readings every 5s + frontend polling `/api/latest` and `/api/history` constantly, bandwidth drained within days. |
+| 🔴 **Connection Pooling Drops** | Supabase's free tier enforces strict connection limits. The Render backend's persistent `pg` connections would get killed during traffic spikes, causing `ECONNRESET` errors and data loss. |
+| 🔴 **Cold Start Latency** | Supabase projects on the free tier pause after inactivity. This caused noticeable delays after the ESP32 reconnected post-sleep cycles. |
+| 🟡 **No Serverless Edge Support** | For future scaling and edge compute plans, Supabase's architecture was limiting. |
+
+#### ✅ Why NeonDB Was Chosen
+
+**NeonDB** is a **serverless PostgreSQL** platform built on top of a branching storage engine (copy-on-write). It was the ideal replacement because:
+
+- **No egress throttling** on the free tier for our use-case workload
+- **Autoscaling compute** — the database scales to zero when idle and spins up instantly on demand (no cold start delays)
+- **Connection pooling built-in** via PgBouncer-compatible pooling, eliminating `ECONNRESET` drops under Render's stateless environment
+- **Identical PostgreSQL dialect** — zero schema changes required, only the `DATABASE_URL` connection string was swapped
+- **Branching support** — NeonDB's branch-per-environment model will enable clean staging/production DB splits in future phases
+
+#### 🔄 Migration Steps Performed
+
+```
+1. Exported full sensor_data table from Supabase via pg_dump
+2. Created new NeonDB project + database
+3. Imported schema + data via psql
+4. Updated .env DATABASE_URL on Render to point to NeonDB
+5. Redeployed backend on Render — zero downtime
+6. Verified data integrity via SELECT COUNT(*) and spot checks
+7. Monitored for 48h — no connection drops, no egress warnings
+```
+
+#### 📊 NeonDB Dashboard — Live Connection Monitor
+
+> The NeonDB dashboard showing active compute, connection pooling status, and database metrics post-migration:
+
+![NeonDB Dashboard](screenshots/neon-db-dashboard.png)
+
+- **NeonDB Integration:** Replaced the previous Supabase connection strings with NeonDB serverless PostgreSQL. This solved the persistent "egress limit exhausted" issue experienced under high continuous data loads.
+- **Backend Redeployment:** Reconfigured and redeployed the Node.js backend on Render to seamlessly synchronize with the new NeonDB architecture without downtime.
+
+---
+
+### 🟢 Phase 12 — Advanced UI Enhancements & Feature Additions
+
+Focused on polishing the dashboard user experience with premium aesthetics and refined data interactions.
+- **Glassmorphism Design:** Implemented modern, premium glassmorphism styling across all sensor cards, the Live AQI banner, and the Alert History panel.
+- **Master Graph Refinement:** Restored the 24-hour predictive and historical overlap chart to use clean, single-color line rendering for improved readability.
+- **PDF Export Optimization:** Enhanced the "Export PDF" functionality to intelligently capture only the graphical charts and summary cards, automatically excluding the raw data tables.
 
 ---
 ## 📡 Production API Endpoints
@@ -397,11 +463,12 @@ CREATE TABLE sensor_data (
 5.  ESP32 constructs JSON payload
 6.  ESP32 sends HTTPS POST → Render Backend
 7.  Backend validates and sanitizes data
-8.  Data is inserted into Supabase PostgreSQL
+8.  Data is inserted into NeonDB PostgreSQL (Serverless)
 9.  Frontend polls  GET /api/latest  → updates sensor cards
 10. Frontend polls  GET /api/history → updates graphs + table
 11. AQI threshold checked → alert banner shown if needed
-12. LOOP repeats every 5 seconds
+12. EmailJS / SMS gateway triggered if threshold breached
+13. LOOP repeats every 5 seconds
 ```
 
 ---
@@ -434,13 +501,15 @@ Send HTTPS POST to Render Backend
   ├─── ✗ HTTP Error → Log & retry
   │
   ▼ ✓ 200 OK
-Backend Validates & Inserts → Supabase PostgreSQL
-  │
+Backend Validates & Inserts → NeonDB PostgreSQL (Serverless)
+  │                            [Migrated from Supabase — Phase 11]
   ▼
 Frontend Fetches /api/latest + /api/history
   │
   ▼
 Render Graphs + Update Cards + AQI Alert Check
+  │
+  ├─── AQI > Threshold → Send Email (EmailJS) + SMS Gateway
   │
   ▼
 Wait 5 Seconds → LOOP ↑
@@ -453,39 +522,11 @@ Wait 5 Seconds → LOOP ↑
 | Scenario | Handling Strategy |
 |----------|------------------|
 | WiFi Disconnection | Auto-reconnect logic on ESP32 |
-| HTTP Error Response | Validation + retry mechanism |
-| Backend Cold Start | Cold start delay handling |
-| CORS Issues | Configured CORS middleware |
-| Secret Exposure | Environment variables via `.env` + Render secrets |
-
----
-
-## 🚀 Final Deployment Architecture
-
-```
-┌──────────────────────────────────────────────────┐
-│  Netlify  — Frontend Dashboard                   │
-│  https://envcore-dashboard-dbms-tt.netlify.app   │
-└───────────────────┬──────────────────────────────┘
-                    │  REST API (HTTPS)
-                    ▼
-┌──────────────────────────────────────────────────┐
-│  Render  — Node.js Backend                       │
-│  https://your-api.onrender.com                   │
-└───────────────────┬──────────────────────────────┘
-                    │  SQL (pg driver)
-                    ▼
-┌──────────────────────────────────────────────────┐
-│  Supabase  — PostgreSQL Cloud DB                 │
-│  Managed, auto-scaled, backed up                 │
-└───────────────────┬──────────────────────────────┘
-                    │  HTTPS POST (every 5s)
-                    ▼
-┌──────────────────────────────────────────────────┐
-│  ESP32  — IoT Device                             │
-│  DHT11 (Temp + Humidity) + MQ135 (AQI)          │
-└──────────────────────────────────────────────────┘
-```
+| HTTP POST Error | Log error code, retry on next 5s cycle |
+| Backend DB Connection Drop | NeonDB auto-reconnects; backend retries with backoff |
+| AQI Threshold Breach | EmailJS fires client-side email; SMS via carrier gateway |
+| Sensor Read Failure | ESP32 returns `-1` / `NaN`; backend rejects and logs |
+| Frontend Offline | Last known data retained; status bar shows "Offline" |
 
 ---
 
@@ -496,20 +537,22 @@ Wait 5 Seconds → LOOP ↑
 | 🟢 Phase 1 | Backend Test Validation | ✅ Complete |
 | 🟢 Phase 2–3 | UI Development | ✅ Complete |
 | 🟢 Phase 4 | Production Backend | ✅ Complete |
-| 🟢 Phase 5–6 | Cloud Deployment | ✅ Complete |
-| 🟢 Phase 7–8 | Frontend + Netlify Integration | ✅ Complete |
+| 🟢 Phase 5–6 | Cloud Deployment (Render + Supabase + Netlify) | ✅ Complete |
+| 🟢 Phase 7–8 | Final Frontend + Netlify Integration | ✅ Complete |
 | 🟢 Phase 9 | Frontend Improvements & Sensor Calibrations | ✅ Complete |
-| 🟢 Phase 10 | SMS (under testing phase) & Email Facility Integration | ✅ Complete |
-| � Phase 11 | User Authentication & Role-Based Access + Dashboard UI Revamp | 🔄 Planned |
-| 🟡 Phase 12 | Advanced Data Analytics & Reporting + Interactive Charting Upgrade | 🔄 Planned |
-| 🟡 Phase 13 | Multi-Sensor Node Support (Scaling) + Map View Integration | 🔄 Planned |
-| 🟡 Phase 14 | Predictive ML Model for AQI Forecasting + Forecast Trend Visuals | 🔄 Planned |
-| 🟡 Phase 15 | MQTT Protocol Migration for IoT Messaging + Real-Time UI Sync Optimization | 🔄 Planned |
-| 🟡 Phase 16 | Web & App Push Notifications for AQI Alerts + Notification Center UI | 🔄 Planned |
-| 🟡 Phase 17 | Mobile Application (React Native / Flutter) + Responsive Layout Refinements | 🔄 Planned |
-| 🟡 Phase 18 | Admin Dashboard for Device Management + Admin Control Panel UI | 🔄 Planned |
-| 🟡 Phase 19 | Edge Computing Layer & Offline Data Sync + Offline Mode Indicators | 🔄 Planned |
-| 🟡 Phase 20 | Full CI/CD Pipeline & Automated Testing + Accessibility (a11y) Improvements | 🔄 Planned |
+| 🟢 Phase 10 | SMS (under testing) & Email Facility Integration | ✅ Complete |
+| 🟢 Phase 11 | NeonDB Migration (Fix Egress Limit) & Backend Redeploy | ✅ Complete |
+| 🟢 Phase 12 | Advanced UI Enhancements (Glassmorphism) & Feature Additions | ✅ Complete |
+| 🟡 Phase 13 | User Authentication & Role-Based Access + Dashboard UI Revamp | 🔄 Planned |
+| 🟡 Phase 14 | Advanced Data Analytics & Reporting + Interactive Charting Upgrade | 🔄 Planned |
+| 🟡 Phase 15 | Multi-Sensor Node Support (Scaling) + Map View Integration | 🔄 Planned |
+| 🟡 Phase 16 | Predictive ML Model for AQI Forecasting + Forecast Trend Visuals | 🔄 Planned |
+| 🟡 Phase 17 | MQTT Protocol Migration for IoT Messaging + Real-Time UI Sync Optimization | 🔄 Planned |
+| 🟡 Phase 18 | Web & App Push Notifications for AQI Alerts + Notification Center UI | 🔄 Planned |
+| 🟡 Phase 19 | Mobile Application (React Native / Flutter) + Responsive Layout Refinements | 🔄 Planned |
+| 🟡 Phase 20 | Admin Dashboard for Device Management + Admin Control Panel UI | 🔄 Planned |
+| 🟡 Phase 21 | Edge Computing Layer & Offline Data Sync + Offline Mode Indicators | 🔄 Planned |
+| 🟡 Phase 22 | Full CI/CD Pipeline & Automated Testing + Accessibility (a11y) Improvements | 🔄 Planned |
 
 ---
 

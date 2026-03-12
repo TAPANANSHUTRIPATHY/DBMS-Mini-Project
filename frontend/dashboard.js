@@ -503,17 +503,32 @@ document.addEventListener("DOMContentLoaded", () => {
 
   document.getElementById("pdfBtn")?.addEventListener("click", () => {
     if (!allData.length) { alert("No data for this date."); return; }
-    const exportArea = document.querySelector(".db-wrap");
-    const actions = document.querySelector(".date-bar-right");
-    actions.style.display = "none";
-
+    
     // Set export button to loading state
     const pdfBtn = document.getElementById("pdfBtn");
     const origText = pdfBtn.innerHTML;
     pdfBtn.innerHTML = "Generating...";
 
+    // Hide actions from the top bar
+    const actions = document.querySelector(".date-bar-right");
+    if (actions) actions.style.display = "none";
+    
+    // Hide the data table and pagination so it only captures up to the AQI graph
+    const tablePanels = document.querySelectorAll(".table-panel, #tableContainer, #pagination");
+    const originalDisplays = [];
+    tablePanels.forEach((el, index) => {
+      originalDisplays[index] = el.style.display;
+      el.style.display = "none";
+    });
+
+    const exportArea = document.querySelector(".db-wrap");
+
     html2canvas(exportArea, { scale: 1.5, backgroundColor: "#06101e", useCORS: true }).then(canvas => {
-      actions.style.display = "flex";
+      // Restore the DOM
+      if (actions) actions.style.display = "flex";
+      tablePanels.forEach((el, index) => {
+        el.style.display = originalDisplays[index];
+      });
       pdfBtn.innerHTML = origText;
 
       const imgData = canvas.toDataURL("image/jpeg", 0.95);
@@ -531,7 +546,11 @@ document.addEventListener("DOMContentLoaded", () => {
       pdf.addImage(imgData, "JPEG", 5, 25, pdfWidth - 10, pdfHeight);
       pdf.save(`ENVCORE_Report_${selectedDate}.pdf`);
     }).catch(err => {
-      actions.style.display = "flex";
+      // Restore the DOM on error
+      if (actions) actions.style.display = "flex";
+      tablePanels.forEach((el, index) => {
+        el.style.display = originalDisplays[index];
+      });
       pdfBtn.innerHTML = origText;
       console.error("PDF generation failed", err);
     });
