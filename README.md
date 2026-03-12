@@ -110,8 +110,6 @@ This project demonstrates end-to-end engineering across:
 
 ![ENVCORE Email Alert Sample](screenshots/Email-Alert.png)
 
-> *(Add screenshot of the actual alert email received in inbox here — e.g., `screenshots/envcore-email-alert.png`)*
-
 ---
 
 ## 🧠 System Architecture
