@@ -106,13 +106,6 @@
                 datasets: [
                     {
                         label: "Temperature (°C)", borderColor: COLORS.temp,
-                        segment: {
-                            borderColor: ctx => {
-                                if (!ctx.p0 || !ctx.p1) return COLORS.temp;
-                                const y = ctx.p0.parsed.y;
-                                return y >= 32 ? '#ff4d4d' : y >= 24 ? '#00ff88' : '#00e5ff';
-                            }
-                        },
                         backgroundColor: rgba(COLORS.temp, 0.08),
                         data: new Array(48).fill(null),
                         tension: 0.4, pointRadius: 2, pointHoverRadius: 5,
@@ -129,13 +122,6 @@
                     },
                     {
                         label: "Air Quality Index", borderColor: COLORS.aqi,
-                        segment: {
-                            borderColor: ctx => {
-                                if (!ctx.p0 || !ctx.p1) return COLORS.aqi;
-                                const y = ctx.p0.parsed.y;
-                                return y >= 100 ? '#ff4d4d' : y >= 60 ? '#ffcc00' : '#00ff88';
-                            }
-                        },
                         backgroundColor: rgba(COLORS.aqi, 0.08),
                         data: new Array(48).fill(null),
                         tension: 0.4, pointRadius: 2, pointHoverRadius: 5,
