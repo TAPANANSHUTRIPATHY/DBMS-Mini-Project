@@ -43,10 +43,8 @@ This project demonstrates end-to-end engineering across:
 
 > 📹 **Project Walkthrough Video**
 >
-> [![ENVCORE Demo](https://img.shields.io/badge/▶%20Watch%20on%20YouTube-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://youtube.com/YOUR_VIDEO_LINK_HERE)
+> [![ENVCORE Demo](https://img.shields.io/badge/▶%20Watch%20on%20YouTube-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://youtu.be/Jb2u176TOGU)
 >
-> *(Replace the link above once the video is uploaded to YouTube)*
-
 ---
 
 ## 🖥️ Frontend UI — Screenshots
