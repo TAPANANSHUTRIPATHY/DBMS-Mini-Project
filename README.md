@@ -11,7 +11,7 @@
 
 **A full-stack IoT platform for real-time environmental data collection, storage, and visualization.**
 
-[🚀 Live Dashboard](https://envcore-dashboard-dbms-tt.netlify.app) • [📡 API Docs](#-production-api-endpoints) • [🎬 Demo Video](#-demo-video) • [🌿 Branches](#-branch-structure)
+[🚀 Live Dashboard](https://envcore-dbms-tt.netlify.app) • [📡 API Docs](#-production-api-endpoints) • [🎬 Demo Video](#-demo-video) • [🌿 Branches](#-branch-structure)
 
 </div>
 
