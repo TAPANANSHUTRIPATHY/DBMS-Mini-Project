@@ -55,8 +55,8 @@ exports.getHistory = async (req, res) => {
       // without the AT TIME ZONE conversion, readings between 12AM and 5:30AM IST would be missed
       result = await pool.query(
         `SELECT * FROM sensor_data
-         WHERE created_at >= ($1::date AT TIME ZONE 'Asia/Kolkata')
-           AND created_at <  (($1::date + interval '1 day') AT TIME ZONE 'Asia/Kolkata')
+         WHERE created_at >= ($1::date - interval '5 hours 30 minutes')
+           AND created_at <  ($1::date + interval '1 day' - interval '5 hours 30 minutes')
          ORDER BY created_at ASC`,
         [req.query.date]
       );
