@@ -1,25 +1,28 @@
-/* ================================================================
-   script.js — ENVCORE Live Data Layer
-   • fetchLatest() every 1 second → appends new point to live charts
-   • fetchHistory() every 10 seconds → syncs sliding window from DB
-   • Backend offline = all values show "--", charts clear
-   • Exposes window.ENVDATA for charts.js
-   • MAX_PTS = 40 → last 40 readings of 1s interval visible at once
-================================================================ */
+// script.js — this is the main live data file for the homepage (index.html)
+// it handles fetching the latest sensor reading every 1 second and updating the UI
+// it also fetches the last 10 seconds of history to populate the live charts
+// it also manages the news ticker, modal open/close, custom cursor, and footer
 
-const API_URL = "https://dbms-mini-project-vgp4.onrender.com/api";
-const MAX_PTS = 40;
+const API_URL = "https://dbms-mini-project-vgp4.onrender.com/api";  // our backend hosted on Render
+const MAX_PTS = 40;  // how many data points to keep on the live charts at once (last 40 readings)
 
-/* Expose API URL for forecast.js (formerly an inline script tag in HTML) */
+// expose the API URL so forecast.js can use it without hardcoding it again
 window._ENVCORE_API_URL = API_URL;
 
-/* ── Shared data bus ── */
+// ENVDATA is a shared data bus — charts.js reads from this object every 1.5s
+// instead of making charts.js do its own API calls, it just reads what script.js already fetched
 window.ENVDATA = {
-  labels: [], temps: [], hums: [], aqis: [],
-  latest: null, ready: false, backendOnline: false,
+  labels: [],           // timestamps for the X-axis of charts
+  temps: [],            // temperature values
+  hums: [],             // humidity values
+  aqis: [],             // air quality index values
+  latest: null,         // the full latest DB row (used by other parts of the UI)
+  ready: false,         // becomes true once we have at least one successful fetch
+  backendOnline: false, // tracks whether the backend is reachable right now
 };
 
-/* ── DOM refs ── */
+// grab all the DOM elements we'll be updating frequently
+// doing this once at the top is faster than calling getElementById every second
 const tempEl = document.getElementById("temp");
 const humEl = document.getElementById("hum");
 const airEl = document.getElementById("air");
@@ -30,7 +33,8 @@ const airCard = document.getElementById("airCard");
 const tempGaugeValue = document.getElementById("tempGaugeValue");
 const airGaugeValue = document.getElementById("airGaugeValue");
 
-/* ── AQI status ── */
+// converts a raw AQI number into a human-readable label and color
+// based on standard AQI categories (Good → Hazardous)
 function getAirStatus(v) {
   if (v <= 50) return { text: "🟢 Good", color: "#00ff88" };
   if (v <= 100) return { text: "🟡 Moderate", color: "#ffcc00" };
@@ -40,20 +44,22 @@ function getAirStatus(v) {
   return { text: "🟤 Hazardous", color: "#800000" };
 }
 
-/* ── Retain last values but show offline status ── */
+// when the backend stops responding, we show the device as Offline
+// we don't wipe the sensor values — we keep the last known reading visible
 function showOffline() {
-  /* Device Status Panel — Offline */
   const dot = document.getElementById('dspDot');
   const status = document.getElementById('dspStatus');
   if (dot) { dot.style.background = '#ff4d4d'; dot.style.boxShadow = '0 0 8px #ff4d4d'; }
   if (status) status.textContent = 'Offline';
 }
 
-/* ================================================================
-   CITY WEATHER NEWS TICKER
-   Uses Open-Meteo (free, no key) + localStorage user_lat/user_lon
-================================================================ */
+// ─────────────────────────────────────────────────────────────────────────────
+// CITY WEATHER NEWS TICKER
+// uses Open-Meteo API (completely free, no API key needed)
+// the user's location is stored in localStorage so it persists between sessions
+// ─────────────────────────────────────────────────────────────────────────────
 
+// WMO weather codes → human readable labels (from the Open-Meteo docs)
 const WMO_CODES = {
   0: 'Clear sky', 1: 'Mostly clear', 2: 'Partly cloudy', 3: 'Overcast',
   45: 'Foggy', 48: 'Icy fog', 51: 'Light drizzle', 53: 'Drizzle', 55: 'Heavy drizzle',
@@ -68,8 +74,9 @@ const WMO_EMOJI = {
   95: '⛈️', 96: '⛈️', 99: '⛈️',
 };
 
+// returns health advice text based on current AQI — shown in the news ticker
 function getHealthAdvice(aqi) {
-  if (aqi <= 50) return null;
+  if (aqi <= 50) return null;  // no advice needed when air is clean
   if (aqi <= 100) return 'Sensitive groups limit outdoor activity.';
   if (aqi <= 150) return 'Unhealthy for sensitive groups — keep windows closed.';
   if (aqi <= 200) return 'Unhealthy air — wear mask outdoors.';
@@ -77,6 +84,7 @@ function getHealthAdvice(aqi) {
   return 'HAZARDOUS — stay indoors, wear N95 mask.';
 }
 
+// same AQI but just returns the category name as a string (used in the ticker text)
 function getAirLevelName(aqi) {
   if (aqi <= 50) return 'Good';
   if (aqi <= 100) return 'Moderate';
@@ -86,13 +94,13 @@ function getAirLevelName(aqi) {
   return 'Hazardous';
 }
 
-/* Cached weather state */
+// cache the weather fetch so we don't hammer the Open-Meteo API every second
 let _cityWeather = null;
 let _weatherFetchedAt = 0;
-const WEATHER_TTL = 10 * 60 * 1000; // 10-min refresh
+const WEATHER_TTL = 10 * 60 * 1000; // only re-fetch weather every 10 minutes
 
 async function fetchCityWeather() {
-  // If no user location is set, default to KIIT Bhubaneswar
+  // read saved location from localStorage, default to KIIT Bhubaneswar if nothing saved
   let lat = parseFloat(localStorage.getItem('user_lat'));
   let lon = parseFloat(localStorage.getItem('user_lon'));
   if (isNaN(lat) || isNaN(lon)) {
@@ -103,8 +111,10 @@ async function fetchCityWeather() {
     localStorage.setItem('user_location', 'Bhubaneswar, Odisha, India');
   }
 
+  // skip if we fetched recently (within TTL)
   if (Date.now() - _weatherFetchedAt < WEATHER_TTL && _cityWeather) return;
   try {
+    // fetch current weather from Open-Meteo (free, no key, supports wind + UV + humidity)
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
       `&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,uv_index` +
       `&wind_speed_unit=kmh&timezone=auto`;
@@ -122,16 +132,18 @@ async function fetchCityWeather() {
       condition: WMO_CODES[code] ?? 'Unknown',
       icon: WMO_EMOJI[code] ?? '🌡️',
     };
-    window.cityWeatherContext = _cityWeather;
+    window.cityWeatherContext = _cityWeather;  // share with charts.js so it can drive the animated background
     _weatherFetchedAt = Date.now();
-    rebuildTicker();
+    rebuildTicker();  // update the ticker text with fresh weather data
   } catch (_) { }
 }
 
-/* Build + show the ticker */
+// these hold the current AQI and status that should appear in the ticker
 let _tickerAqi = null;
 let _tickerStatus = null;
 
+// rebuilds the ticker text content from the latest city weather + sensor AQI
+// duplicates the segment so the CSS marquee animation loops seamlessly
 function rebuildTicker() {
   const banner = document.getElementById('alertBanner');
   const textEl = document.getElementById('alertText');
@@ -141,12 +153,11 @@ function rebuildTicker() {
   const w = _cityWeather;
   const aqi = _tickerAqi;
 
-  const parts = ['\u00a0\u00a0\u00a0\u00a0'];
+  const parts = ['\u00a0\u00a0\u00a0\u00a0'];  // leading spaces for visual padding
 
-  // City name
-  parts.push(`📍 ${city.split(',')[0].trim()}`);
+  parts.push(`📍 ${city.split(',')[0].trim()}`);  // just the city name, not the full address
 
-  // Weather block
+  // add weather info if we have it
   if (w) {
     parts.push(
       `${w.icon} ${w.condition}`,
@@ -156,7 +167,7 @@ function rebuildTicker() {
     );
   }
 
-  // Sensor AQI block (Simplified Design)
+  // add sensor AQI (from our ESP32) or "Sensor Offline" if no data
   if (aqi !== null) {
     const level = getAirLevelName(aqi);
     parts.push(`📡 Sensor AQI: ${aqi} — ${level}`);
@@ -166,47 +177,50 @@ function rebuildTicker() {
 
   const sep = '        •        ';
   const seg = parts.join(sep) + '                    ';
-  const newText = seg + seg; // duplicate for seamless loop
+  const newText = seg + seg;  // duplicate so the CSS scroll animation loops without a gap
   if (textEl.textContent !== newText) {
     textEl.textContent = newText;
   }
 
+  // change the accent color of the ticker based on the AQI severity
   const color = (_tickerStatus?.color) ?? '#00e5ff';
   banner.style.setProperty('--alert-color', color);
   banner.style.borderLeftColor = color;
-  banner.classList.remove('hidden'); // always visible
+  banner.classList.remove('hidden');
 }
 
-/* Called from fetchLatest every second */
+// called from fetchLatest every second with the latest AQI reading + status object
 function updateTicker(aqi, statusObj) {
   _tickerAqi = aqi;
   _tickerStatus = statusObj;
   rebuildTicker();
-  fetchCityWeather(); // async, uses cache
+  fetchCityWeather();  // this internally checks the cache so it won't actually re-fetch unless 10 min passed
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  setTimeout(fetchCityWeather, 600);
+  setTimeout(fetchCityWeather, 600);  // delay slightly so the page finishes loading first
+  // if the user changes their location, clear the weather cache and refetch
   window.addEventListener('locationUpdated', () => {
     _cityWeather = null; _weatherFetchedAt = 0;
     setTimeout(fetchCityWeather, 400);
   });
 });
 
-/* ================================================================
-   CHART SETUP
-================================================================ */
+// ─────────────────────────────────────────────────────────────────────────────
+// CHART SETUP — live scrolling line charts for temp and AQI
+// ─────────────────────────────────────────────────────────────────────────────
 const FONT = "Rajdhani";
-const TICK = "rgba(200,232,255,0.72)";
-const GRID = "rgba(255,255,255,0.06)";
+const TICK = "rgba(200,232,255,0.72)";   // axis text color
+const GRID = "rgba(255,255,255,0.06)";   // subtle grid lines
 
-/* ── Device Status: 40-second offline detection ── */
+// this checks every 5 seconds if the ESP32 has gone silent
+// if no new data in 6 minutes → mark device as offline
 function updateSignalBars(state) {
   const barsContainer = document.getElementById('dspSignalBars');
   const valEl = document.getElementById('dspSignalVal');
   if (!barsContainer || !valEl) return;
 
-  barsContainer.className = 'dsp-signal-bars'; // reset classes
+  barsContainer.className = 'dsp-signal-bars';  // reset all signal bar CSS classes
   const bars = barsContainer.querySelectorAll('.sig-bar');
   bars.forEach(b => b.classList.remove('active'));
 
@@ -230,15 +244,15 @@ function updateSignalBars(state) {
   }
 }
 
-let lastDataTime = 0;  // epoch ms of last successful data point
+let lastDataTime = 0;  // stores the epoch ms of the last time we got a valid reading
 
 function checkDeviceTimeout() {
   if (!lastDataTime) {
-    updateSignalBars('bad');
+    updateSignalBars('bad');  // never received any data
     return;
   }
   const elapsed = Date.now() - lastDataTime;
-  const OFFLINE_AFTER = 6 * 60 * 1000; // 6 minutes
+  const OFFLINE_AFTER = 6 * 60 * 1000;  // 6 minutes without data = treat as offline
   if (elapsed > OFFLINE_AFTER) {
     const dot = document.getElementById('dspDot');
     const status = document.getElementById('dspStatus');
@@ -248,15 +262,16 @@ function checkDeviceTimeout() {
   }
 }
 
-setInterval(checkDeviceTimeout, 5000); // check every 5 s
+setInterval(checkDeviceTimeout, 5000);  // run the check every 5 seconds
 
 let tempChart = null;
 let airChart = null;
 
+// factory function to create a Chart.js line chart with our standard dark-theme styling
 function makeLineChart(id, label, color, yMin, yMax, yStep) {
   const el = document.getElementById(id);
   if (!el) return null;
-  const fill = color.replace("rgb(", "rgba(").replace(")", ",0.13)");
+  const fill = color.replace("rgb(", "rgba(").replace(")", ",0.13)");  // semi-transparent fill under the line
   return new Chart(el.getContext("2d"), {
     type: "line",
     data: {
@@ -268,7 +283,7 @@ function makeLineChart(id, label, color, yMin, yMax, yStep) {
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      animation: false,   /* skip animation on live chart for instant scroll */
+      animation: false,   // disable animation on the live chart so it scrolls smoothly without flickering
       plugins: {
         legend: { labels: { color: TICK, font: { family: FONT, size: 13 }, boxWidth: 26, padding: 12 } },
         tooltip: {
@@ -289,25 +304,30 @@ function makeLineChart(id, label, color, yMin, yMax, yStep) {
   });
 }
 
+// create the two live charts — temp/humidity combined and AQI separately
 tempChart = makeLineChart("tempHumChart", "Temperature (°C)", "rgb(255,77,77)", -10, 60, 5);
 airChart = makeLineChart("airChart", "Air Quality", "rgb(0,255,136)", 0, 500, 50);
 
-/* ================================================================
-   APPEND ONE POINT to the live sliding window
-================================================================ */
+// ─────────────────────────────────────────────────────────────────────────────
+// LIVE DATA WINDOW (append + scroll)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// adds a new data point to the ENVDATA arrays and trims to MAX_PTS
+// returns false and skips if the timestamp is the same as the last one (duplicate reading)
 function appendPoint(label, temp, hum, aqi) {
   const D = window.ENVDATA;
-  if (D.labels.length > 0 && D.labels[D.labels.length - 1] === label) return false;
+  if (D.labels.length > 0 && D.labels[D.labels.length - 1] === label) return false;  // already have this timestamp
   D.labels.push(label); D.temps.push(temp); D.hums.push(hum); D.aqis.push(aqi);
+  // keep only the last MAX_PTS readings — shift() removes the oldest from the front
   if (D.labels.length > MAX_PTS) { D.labels.shift(); D.temps.shift(); D.hums.shift(); D.aqis.shift(); }
   D.ready = true; D.backendOnline = true;
   return true;
 }
 
-/* ================================================================
-   fetchLatest — every 1 second
-================================================================ */
-let _latestTs = "";
+// ─────────────────────────────────────────────────────────────────────────────
+// fetchLatest — runs every 1 second
+// ─────────────────────────────────────────────────────────────────────────────
+let _latestTs = "";  // stores the last seen timestamp to detect new readings
 
 async function fetchLatest() {
   try {
@@ -320,10 +340,12 @@ async function fetchLatest() {
     const hum = parseFloat(d.humidity);
     const aqi = parseFloat(d.air_quality);
     if (isNaN(temp) || isNaN(hum) || isNaN(aqi)) {
-      updateSignalBars('good'); // Data is coming, but might be malformed/partial
+      updateSignalBars('good');  // backend is alive but returned incomplete data
       return;
     }
 
+    // only show live values if the latest DB row is from today
+    // if the ESP32 hasn't sent data today, show "--" so users don't see stale yesterday data
     const isToday = (d.created_at) && (new Date(d.created_at).setHours(0, 0, 0, 0) === new Date().setHours(0, 0, 0, 0));
     const status = getAirStatus(aqi);
 
@@ -334,14 +356,14 @@ async function fetchLatest() {
       if (airStatusEl) airStatusEl.textContent = status.text;
       if (tempStatusEl) tempStatusEl.textContent = '';
       if (humStatusEl) humStatusEl.textContent = '';
-      if (airCard) airCard.style.boxShadow = `0 0 30px ${status.color}`;  /* data-driven, must stay in JS */
+      if (airCard) airCard.style.boxShadow = `0 0 30px ${status.color}`;  // glow color matches AQI severity
 
-      /* \u2500\u2500 News ticker: city weather + sensor AQI \u2500\u2500 */
-      updateTicker(aqi, status);
+      updateTicker(aqi, status);  // update the news ticker with current sensor data
 
       if (tempGaugeValue) tempGaugeValue.textContent = temp.toFixed(1) + " \u00b0C";
       if (airGaugeValue) airGaugeValue.textContent = aqi;
     } else {
+      // latest DB row is from a previous day — show "--" so it's clear no fresh data today
       if (tempEl) tempEl.textContent = '--';
       if (humEl) humEl.textContent = '--';
       if (airEl) airEl.textContent = '--';
@@ -349,9 +371,7 @@ async function fetchLatest() {
       if (humStatusEl) humStatusEl.textContent = 'No Data Today';
       if (airStatusEl) airStatusEl.textContent = 'No Data Today';
       if (airCard) airCard.style.boxShadow = `0 0 30px rgba(255,255,255,0.1)`;
-
       updateTicker(null, null);
-
       if (tempGaugeValue) tempGaugeValue.textContent = '--';
       if (airGaugeValue) airGaugeValue.textContent = '--';
     }
@@ -359,11 +379,12 @@ async function fetchLatest() {
     window.ENVDATA.latest = d;
     window.ENVDATA.backendOnline = true;
 
-    /* ── Device Status Panel — check ESP data freshness ── */
+    // ── Device Status Panel — check how old the last reading is ──
     const dot = document.getElementById('dspDot');
     const dspStatus = document.getElementById('dspStatus');
     const dspLastData = document.getElementById('dspLastData');
 
+    // format the timestamp of the last received reading nicely (e.g. "Thu 27 Mar 12:34:05")
     if (dspLastData && d.created_at) {
       const dt = new Date(d.created_at);
       const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -372,30 +393,30 @@ async function fetchLatest() {
         dt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     }
 
+    // if data is more than 10 minutes old → ESP32 has gone silent → mark offline
     const dataAgeMs = d.created_at ? Date.now() - new Date(d.created_at).getTime() : Infinity;
-    const DEVICE_STALE_MS = 10 * 60 * 1000; // 10 minutes
+    const DEVICE_STALE_MS = 10 * 60 * 1000;
 
     if (dataAgeMs <= DEVICE_STALE_MS) {
-      // Fresh data — ESP is Online
-      lastDataTime = Date.now();
+      lastDataTime = Date.now();  // record the last time we got fresh data (used by checkDeviceTimeout)
       if (dot) { dot.style.background = '#00ff88'; dot.style.boxShadow = '0 0 10px #00ff88'; }
       if (dspStatus) { dspStatus.textContent = 'Online'; dspStatus.style.color = '#00ff88'; }
       updateSignalBars('excellent');
     } else {
-      // Stale data — ESP is Offline (backend alive but no new readings)
+      // backend is alive but no new readings from the ESP32 in over 10 minutes
       if (dot) { dot.style.background = '#ff4d4d'; dot.style.boxShadow = '0 0 8px #ff4d4d'; }
       if (dspStatus) { dspStatus.textContent = 'Offline'; dspStatus.style.color = '#ff4d4d'; }
       updateSignalBars('bad');
     }
 
-    /* ── Alerts managed on alerts.html ── */
-
+    // only append to charts if the data is from today
     if (isToday) {
       const ts = d.created_at || new Date().toISOString();
       const label = new Date(ts).toLocaleTimeString("en-GB");
       appendPoint(label, temp, hum, aqi);
     }
 
+    // push the updated arrays into Chart.js and re-render (update("none") = no animation)
     const D = window.ENVDATA;
     if (tempChart && D.labels.length > 0) {
       tempChart.data.labels = D.labels;
@@ -410,14 +431,16 @@ async function fetchLatest() {
   } catch (_) { showOffline(); }
 }
 
-/* ================================================================
-   fetchHistory — every 10 seconds
-================================================================ */
-let _historyLastTs = "";
+// ─────────────────────────────────────────────────────────────────────────────
+// fetchHistory — runs every 10 seconds
+// this pre-populates the charts with recent history so they're not empty on first load
+// also syncs the ENVDATA bus for charts.js to read
+// ─────────────────────────────────────────────────────────────────────────────
+let _historyLastTs = "";  // used to skip re-rendering if nothing changed
 
 async function fetchHistory() {
   const endpoints = [
-    `${API_URL}/history?limit=10000`,
+    `${API_URL}/history?limit=10000`,  // try these URLs in order, stop at the first one that works
     `${API_URL}/history?all=true`,
     `${API_URL}/history`,
   ];
@@ -428,17 +451,17 @@ async function fetchHistory() {
       const raw = await res.json();
       if (!Array.isArray(raw) || !raw.length) continue;
 
+      // only keep the last MAX_PTS rows for the live charts
       const slice = raw.slice(-MAX_PTS);
       const lastTs = raw[raw.length - 1]?.created_at || "";
-      if (lastTs === _historyLastTs) break;
+      if (lastTs === _historyLastTs) break;  // nothing new since last fetch, skip update
       _historyLastTs = lastTs;
 
       const todayMidnight = new Date().setHours(0, 0, 0, 0);
       const todaySlice = slice.filter(p => p.created_at && new Date(p.created_at).setHours(0, 0, 0, 0) === todayMidnight);
 
-      /* Use today's data for the real-time charts if available,
-         otherwise fall back to the last available records so sparklines
-         and health ring always show something. */
+      // prefer today's data for the charts, but fall back to any recent data
+      // so the sparklines and health ring don't look empty on days with no ESP32 data
       const useSlice = todaySlice.length > 0 ? todaySlice : slice;
 
       const labels = useSlice.map(d => new Date(d.created_at).toLocaleTimeString("en-GB"));
@@ -446,6 +469,7 @@ async function fetchHistory() {
       const hums = useSlice.map(d => parseFloat(d.humidity));
       const aqis = useSlice.map(d => parseFloat(d.air_quality));
 
+      // update the shared ENVDATA object — charts.js will pick this up on its next sync tick
       window.ENVDATA.labels = labels;
       window.ENVDATA.temps = temps;
       window.ENVDATA.hums = hums;
@@ -453,7 +477,7 @@ async function fetchHistory() {
       window.ENVDATA.ready = true;
       window.ENVDATA.backendOnline = true;
 
-      /* Only show real-time line charts if data is from today */
+      // only update the real-time line charts if the data is actually from today
       if (todaySlice.length > 0) {
         if (tempChart) { tempChart.data.labels = labels; tempChart.data.datasets[0].data = temps; tempChart.update("none"); }
         if (airChart) { airChart.data.labels = labels; airChart.data.datasets[0].data = aqis; airChart.update("none"); }
@@ -464,16 +488,17 @@ async function fetchHistory() {
   }
 }
 
-/* ================================================================
-   MODAL HELPERS
-   Use CSS class "is-open" instead of style.display manipulation.
-   Exposed on window so forecast.js / location.js can call them.
-================================================================ */
+// ─────────────────────────────────────────────────────────────────────────────
+// MODAL HELPERS
+// modals use a CSS class "is-open" to show/hide rather than style.display
+// this is better because CSS transitions work properly with classes
+// openModal and closeModal are exposed on window so forecast.js and location.js can call them
+// ─────────────────────────────────────────────────────────────────────────────
 window.openModal = function (id) {
   const el = document.getElementById(id);
   if (!el) return;
   el.classList.add("is-open");
-  /* Trigger chart resize after transition */
+  // give the chart inside the modal a moment to render after the transition
   setTimeout(() => {
     if (id === "tempModal") window._modalResizeFn?.("tempModal");
     if (id === "humModal") window._modalResizeFn?.("humModal");
@@ -486,23 +511,24 @@ window.closeModal = function (id) {
   if (el) el.classList.remove("is-open");
 };
 
-/* ================================================================
-   EVENT WIRING — all handler that were formerly inline onclick=
-   (located in index.html). Script runs with defer so DOM is ready.
-================================================================ */
+// ─────────────────────────────────────────────────────────────────────────────
+// DOM EVENT WIRING
+// all the button clicks, modal triggers, keyboard shortcuts etc.
+// we do this in DOMContentLoaded so the elements exist when we try to attach listeners
+// ─────────────────────────────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", () => {
 
-  /* Alert close button */
+  // close the alert/ticker banner
   document.getElementById("alertClose")?.addEventListener("click", () => {
     document.getElementById("alertBanner")?.classList.add("hidden");
   });
 
-  /* Location badge → open locationModal */
+  // clicking the location badge at the top opens the location picker modal
   document.getElementById("locationBadge")?.addEventListener("click", () => {
     window.openModal("locationModal");
   });
 
-  /* Fullscreen buttons */
+  // fullscreen buttons — each opens a modal with a larger version of that chart
   document.getElementById("masterFullscreenBtn")?.addEventListener("click", () => {
     window.openMasterModal?.();
   });
@@ -516,64 +542,56 @@ document.addEventListener("DOMContentLoaded", () => {
     window.openModal("airModal");
   });
 
-  /* Modal backdrop + close buttons — delegate on all modals */
+  // clicking the backdrop (the dark area behind the modal) should close it
   document.querySelectorAll(".modal").forEach(modal => {
-    /* Click on backdrop closes modal */
     modal.addEventListener("click", e => {
       if (e.target === modal) window.closeModal(modal.id);
     });
   });
+  // also wire up the close (×) buttons inside each modal
   document.querySelectorAll(".close[data-modal]").forEach(btn => {
     btn.addEventListener("click", () => {
       window.closeModal(btn.dataset.modal);
     });
   });
 
-  /* Escape key closes any open modal */
+  // pressing Escape closes any open modal
   document.addEventListener("keydown", e => {
     if (e.key === "Escape") {
       document.querySelectorAll(".modal.is-open").forEach(m => window.closeModal(m.id));
     }
   });
 
-  /* ================================================================
-     CUSTOM GLOWING CURSOR LOGIC
-  ================================================================ */
+  // ── Custom Glowing Cursor ──────────────────────────────────────────────────
+  // replaces the default browser cursor with a custom neon dot + outer ring
+  // uses requestAnimationFrame for smooth movement without jank
   const cursor = document.getElementById('customCursor');
   const cursorRing = document.getElementById('customCursorRing');
 
   if (cursor && cursorRing) {
-    // Hide default cursor over the entire document just in case
-    document.documentElement.style.cursor = 'none';
+    document.documentElement.style.cursor = 'none';  // hide the default cursor globally
 
-    // Track mouse position
     document.addEventListener('mousemove', (e) => {
-      // Use requestAnimationFrame for smoother performance
       requestAnimationFrame(() => {
         cursor.style.left = `${e.clientX}px`;
         cursor.style.top = `${e.clientY}px`;
-
-        // Add a slight delay/easing to the ring for a "following" effect
-        // A simple approach is just locking it to the mouse with transition in CSS
+        // the ring follows the cursor with a slight lag (handled by CSS transition)
         cursorRing.style.left = `${e.clientX}px`;
         cursorRing.style.top = `${e.clientY}px`;
       });
     });
 
-    // Handle clicking animation
+    // add a "clicking" class while mouse is held — triggers a scale animation in CSS
     document.addEventListener('mousedown', () => document.body.classList.add('cursor-clicking'));
     document.addEventListener('mouseup', () => document.body.classList.remove('cursor-clicking'));
 
-    // Handle hovering over interactive elements
+    // use event delegation so dynamically added elements also get the hover effect
     const interactiveSelectors = 'a, button, input, .clickable, .close[data-modal], .loc-dd-item';
-
-    // We use event delegation on body for dynamically added elements (like dropdowns)
     document.body.addEventListener('mouseover', (e) => {
       if (e.target.closest(interactiveSelectors)) {
         document.body.classList.add('cursor-hovering');
       }
     });
-
     document.body.addEventListener('mouseout', (e) => {
       if (e.target.closest(interactiveSelectors)) {
         document.body.classList.remove('cursor-hovering');
@@ -581,9 +599,9 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  /* ================================================================
-     FOOTER TICKER INIT
-  ================================================================ */
+  // ── Footer Ticker ────────────────────────────────────────────────────────────
+  // a scrolling marquee at the bottom showing project info + today's date
+  // duplicated twice so the CSS animation loops without a gap (seamless loop trick)
   const footerTicker = document.getElementById('footerTickerInner');
   if (footerTicker) {
     const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -591,7 +609,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const now = new Date();
     const dateStr = `${DAYS[now.getDay()]}, ${now.getDate()} ${MONTHS[now.getMonth()]} ${now.getFullYear()}`;
 
-    // Build one segment
     const segHtml = `
       <div class="ft-segment">
         Made with <span class="ft-heart">❤</span>
@@ -605,17 +622,19 @@ document.addEventListener("DOMContentLoaded", () => {
         B.Tech CSE · KIIT University · Bhubaneswar
       </div>
     `;
-    // Duplicate for seamless loop
-    footerTicker.innerHTML = segHtml + segHtml;
+    footerTicker.innerHTML = segHtml + segHtml;  // double it up for the seamless scroll loop
   }
 
 });
 
-/* ================================================================
-   TIMERS
-================================================================ */
+// ─────────────────────────────────────────────────────────────────────────────
+// POLLING INTERVALS
+// fetchLatest runs every 1 second for live sensor values
+// fetchHistory runs every 10 seconds to sync chart data from DB
+// ─────────────────────────────────────────────────────────────────────────────
 setInterval(fetchLatest, 1000);
 setInterval(fetchHistory, 10000);
 
+// run once immediately so there's data on screen right away, without waiting for the first interval
 fetchHistory();
-setTimeout(fetchLatest, 500);
+setTimeout(fetchLatest, 500);  // small delay so the page finishes painting before the first API call

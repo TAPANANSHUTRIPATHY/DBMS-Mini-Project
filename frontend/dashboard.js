@@ -1,93 +1,102 @@
-/* ================================================================
-   dashboard.js — ENVCORE Historical Dashboard
-   
-   OPTIMIZATIONS vs original:
-   1. Parallel fetch: all endpoints raced via Promise.any() → first
-      successful response wins, eliminating sequential 10s timeouts.
-   2. Raw data cache (60s TTL): switching dates or auto-refresh reuses
-      previously fetched data without new network calls.
-   3. animation: false on all existing charts for instant rendering.
-   4. 24HR Master Chart: fixed 00:00–23:00 axis, date-aware,
-      null gaps show as line breaks (spanGaps: false).
-
-   Auto-refreshes every 30 s (silent) so today's data grows live.
-================================================================ */
+// dashboard.js — this handles everything on the historical dashboard page (dashboard.html)
+// the user picks a date, we fetch all sensor readings for that day from the DB,
+// and then display them in 4 charts + a summary stats panel + a paginated data table
 
 const API_DB = "https://dbms-mini-project-vgp4.onrender.com/api";
-const ROWS_PER_PAGE = 50;
+const ROWS_PER_PAGE = 50;  // show 50 rows per page in the data table
 const FONT = "Rajdhani";
-const TICK = "rgba(200,232,255,0.72)";
-const GRID = "rgba(255,255,255,0.06)";
+const TICK = "rgba(200,232,255,0.72)";   // axis tick label color
+const GRID = "rgba(255,255,255,0.06)";   // very subtle grid lines
 
-/* 48-slot X-axis labels (30-min intervals) */
+// X-axis labels for the 24hr master chart — one label per 30-min slot (00:00, 00:30 … 23:30)
 const HOURS_48 = Array.from({ length: 48 }, (_, i) => {
   const h = Math.floor(i / 2);
   const m = i % 2 === 0 ? "00" : "30";
   return `${String(h).padStart(2, "0")}:${m}`;
 });
 
+// consistent colors for each metric across all charts
 const COLORS = {
   temp: "rgb(255,128,128)",
   hum: "rgb(0,229,255)",
   aqi: "rgb(0,255,136)",
 };
 
+// helper to make a color semi-transparent by turning rgb( into rgba( and appending the alpha
 function rgba(c, a) { return c.replace("rgb(", "rgba(").replace(")", `,${a})`); }
 
-let allData = [];
-let currentPage = 1;
-let selectedDate = todayStr();
-let refreshTimer = null;
+// state variables
+let allData = [];           // all the rows fetched for the selected date
+let currentPage = 1;        // which page of the table we're on
+let selectedDate = todayStr();  // currently selected date (default to today)
+let refreshTimer = null;    // holds the setInterval ID for auto-refresh
 
-/* ── Chart instances ── */
+// chart instances — initialized in DOMContentLoaded
 let dbTempChart = null;
 let dbHumChart = null;
 let dbAqiChart = null;
 let db24hrChart = null;
 
-/* ================================================================
-   RAW DATA CACHE  — avoid re-fetching within 60 s
-================================================================ */
+// ─────────────────────────────────────────────────────────────────────────────
+// RAW DATA CACHE — saves repeated network calls when switching tabs or on auto-refresh
+// if we already have this date's data and it's less than 60 seconds old, use it
+// ─────────────────────────────────────────────────────────────────────────────
 let _cachedRaw = null;
-let _cachedDate = null;  /* date string the cache belongs to */
-let _cacheExpiry = 0;    /* epoch ms */
-const CACHE_TTL = 60000; /* 60 s */
+let _cachedDate = null;   // which date the cached data belongs to
+let _cacheExpiry = 0;     // epoch ms when the cache expires
+const CACHE_TTL = 60000;  // 60 second cache lifetime
 
-/* ================================================================
-   UTILITIES
-================================================================ */
+// ─────────────────────────────────────────────────────────────────────────────
+// UTILITY FUNCTIONS
+// ─────────────────────────────────────────────────────────────────────────────
+
+// returns today's date as "YYYY-MM-DD"
 function todayStr() {
   const d = new Date();
   return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
 }
 
+// pads a number to 2 digits (e.g. 5 → "05")
 function p2(n) { return String(n).padStart(2, "0"); }
 
+// converts a UTC ISO string to a "YYYY-MM-DD" in local time
+// needed because JS Date parses UTC but we want to display in the user's local timezone
 function localDate(isoStr) {
   const d = new Date(isoStr);
   return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
 }
 
 function fmtTime(isoStr) {
-  return new Date(isoStr).toLocaleTimeString("en-GB");
+  return new Date(isoStr).toLocaleTimeString("en-GB");  // formats as HH:MM:SS
 }
+
+// formats a date string as a long human-readable form like "Friday, 28 March 2025"
 function fmtLong(dateStr) {
   return new Date(dateStr + "T12:00:00").toLocaleDateString("en-GB",
     { weekday: "long", year: "numeric", month: "long", day: "numeric" });
 }
+
+// just the day of week — used in CSV filenames
 function dayName(dateStr) {
   return new Date(dateStr + "T12:00:00").toLocaleDateString("en-GB", { weekday: "long" });
 }
+
 function avg(arr) { return arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0; }
-function s1(v) { return Number(v).toFixed(1); }
+function s1(v) { return Number(v).toFixed(1); }  // round to 1 decimal place as a string
+
+// safely sets the text content of a DOM element by ID (does nothing if element not found)
 function setEl(id, v) { const e = document.getElementById(id); if (e) e.textContent = v; }
 
+// calculates an overall environmental health score from 0–100
+// ideal conditions: 22°C, 50% humidity, 0 AQI
+// temp: -4 pts per 1°C away from ideal | humidity: -2 pts per 1% away | AQI: linear scale to 500
 function healthScore(t, h, a) {
   return Math.round((Math.max(0, 100 - Math.abs(t - 22) * 4) +
     Math.max(0, 100 - Math.abs(h - 50) * 2) +
     Math.max(0, 100 - (a / 500) * 100)) / 3);
 }
 
+// returns an HTML badge showing the AQI category (Good / Moderate / etc.)
 function aqiBadge(v) {
   if (v <= 50) return `<span class="badge-aqi badge-clean">Good</span>`;
   if (v <= 100) return `<span class="badge-aqi badge-moderate">Moderate</span>`;
@@ -95,6 +104,7 @@ function aqiBadge(v) {
   return `<span class="badge-aqi badge-poor" style="color:#ff4d4d">Hazardous</span>`;
 }
 
+// maps a health score to a color — green (excellent) to red (poor)
 function hColor(s) {
   if (s >= 80) return "#00ff88";
   if (s >= 60) return "#00e5ff";
@@ -102,13 +112,15 @@ function hColor(s) {
   return "#ff4d4d";
 }
 
-/* ================================================================
-   CHART INIT
-================================================================ */
+// ─────────────────────────────────────────────────────────────────────────────
+// CHART INITIALIZATION
+// ─────────────────────────────────────────────────────────────────────────────
+
+// creates a single-metric line chart with our standard dark styling
 function buildLineChart(id, label, color, yMin, yMax, yStep) {
   const el = document.getElementById(id);
   if (!el) return null;
-  const fill = rgba(color, 0.13);
+  const fill = rgba(color, 0.13);  // translucent fill under the line
   return new Chart(el.getContext("2d"), {
     type: "line",
     data: {
@@ -120,7 +132,7 @@ function buildLineChart(id, label, color, yMin, yMax, yStep) {
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      animation: false,   /* instant render — no animation delay */
+      animation: false,   // no animation — data loads instantly on date switch
       plugins: {
         legend: { labels: { color: TICK, font: { family: FONT, size: 13 }, boxWidth: 26, padding: 12 } },
         tooltip: {
@@ -141,27 +153,31 @@ function buildLineChart(id, label, color, yMin, yMax, yStep) {
   });
 }
 
+// builds the big 24-hour master chart with all 3 metrics on separate Y axes
+// uses 48 fixed slots (one per 30 min) — null means no reading in that slot → shows as a line break
+// each metric gets its own color-coded Y axis (left, right, far-right)
 function build24hrChart(id) {
   const el = document.getElementById(id);
   if (!el) return null;
   return new Chart(el.getContext("2d"), {
     type: "line",
     data: {
-      labels: HOURS_48,
+      labels: HOURS_48,  // fixed 48 labels regardless of missing data
       datasets: [
         {
           label: "Temperature (°C)", borderColor: COLORS.temp,
           segment: {
+            // color each line segment dynamically based on the temperature value at that point
             borderColor: ctx => {
               if (!ctx.p0 || !ctx.p1) return COLORS.temp;
               const y = ctx.p0.parsed.y;
-              return y >= 32 ? '#ff4d4d' : y >= 24 ? '#00ff88' : '#00e5ff';
+              return y >= 32 ? '#ff4d4d' : y >= 24 ? '#00ff88' : '#00e5ff';  // hot = red, normal = green, cold = blue
             }
           },
           backgroundColor: rgba(COLORS.temp, 0.08),
-          data: new Array(48).fill(null),
+          data: new Array(48).fill(null),  // start with all nulls (no data)
           tension: 0.4, pointRadius: 3, pointHoverRadius: 6,
-          borderWidth: 2.5, yAxisID: "y", fill: false, spanGaps: false,
+          borderWidth: 2.5, yAxisID: "y", fill: false, spanGaps: false,  // spanGaps:false = line breaks at null
         },
         {
           label: "Humidity (%)", borderColor: COLORS.hum,
@@ -173,6 +189,7 @@ function build24hrChart(id) {
         {
           label: "Air Quality Index", borderColor: COLORS.aqi,
           segment: {
+            // color AQI line red when hazardous, yellow when moderate, green when good
             borderColor: ctx => {
               if (!ctx.p0 || !ctx.p1) return COLORS.aqi;
               const y = ctx.p0.parsed.y;
@@ -215,7 +232,7 @@ function build24hrChart(id) {
         y1: {
           type: "linear", position: "right",
           grace: "15%",
-          ticks: { color: COLORS.hum, font: { family: FONT, size: 10 } }, grid: { drawOnChartArea: false },
+          ticks: { color: COLORS.hum, font: { family: FONT, size: 10 } }, grid: { drawOnChartArea: false },  // don't draw horizontal grid for this axis (would overlap)
           title: { display: true, text: "Humidity (%)", color: COLORS.hum, font: { family: FONT, size: 10 } },
         },
         y2: {
@@ -229,6 +246,7 @@ function build24hrChart(id) {
   });
 }
 
+// build all charts once the DOM is ready
 document.addEventListener("DOMContentLoaded", () => {
   dbTempChart = buildLineChart("dbTempChart", "Temperature (°C)", COLORS.temp, -10, 60, 5);
   dbHumChart = buildLineChart("dbHumChart", "Humidity (%)", COLORS.hum, 0, 100, 5);
@@ -236,15 +254,13 @@ document.addEventListener("DOMContentLoaded", () => {
   db24hrChart = build24hrChart("db24hrChart");
 });
 
-/* ================================================================
-   FETCH ALL RECORDS  — parallel strategy, cached
-   
-   All known URL patterns fire at once via Promise.any().
-   First successful response wins. Result is cached 60 s so
-   date switching and silent auto-refresh never re-fetch.
-================================================================ */
+// ─────────────────────────────────────────────────────────────────────────────
+// FETCH WITH CACHE
+// we cache the fetched data for 60 seconds so switching back to a date doesn't
+// re-hit the backend — also makes the silent auto-refresh much faster
+// ─────────────────────────────────────────────────────────────────────────────
 async function fetchAllRecords(dateStr) {
-  /* Return cached data if still fresh AND same date */
+  // return cached data if it's fresh and for the same date
   if (_cachedRaw && Date.now() < _cacheExpiry && _cachedDate === dateStr) {
     console.log(`[ENVCORE] Using cached data (${_cachedRaw.length} rows) for ${dateStr}`);
     return _cachedRaw;
@@ -253,7 +269,7 @@ async function fetchAllRecords(dateStr) {
   const timeout = ms => ({ signal: AbortSignal.timeout(ms) });
 
   try {
-    // Send date to backend — SQL filters, only ~288 rows returned instead of 100,000+
+    // backend filters by date in SQL, so we get only ~288 rows (one per 5 min) not 100k+
     const url = dateStr
       ? `${API_DB}/history?date=${dateStr}`
       : `${API_DB}/history`;
@@ -274,21 +290,23 @@ async function fetchAllRecords(dateStr) {
   }
 }
 
-
-/* ================================================================
-   UPDATE 24HR MASTER CHART (30-min bucketing & live pulse fx)
-================================================================ */
+// ─────────────────────────────────────────────────────────────────────────────
+// UPDATE 24HR CHART (slot bucketing)
+// each sensor reading is put into one of 48 30-min slots based on its timestamp
+// slots with no reading stay null → chart shows a line break there
+// the very last data point gets a bigger dot to show the "live edge" (like ISRO telemetry)
+// ─────────────────────────────────────────────────────────────────────────────
 function update24hrChart(dateRows) {
   if (!db24hrChart) return;
   const tempSlots = new Array(48).fill(null);
   const humSlots = new Array(48).fill(null);
   const aqiSlots = new Array(48).fill(null);
 
-  let lastSlotIndex = -1;
+  let lastSlotIndex = -1;  // tracks the most recent slot that has data (for the pulse dot)
 
   dateRows.forEach(r => {
     const d = new Date(r.created_at);
-    // 30 minute bucketing logic (index 0 to 47):
+    // each slot = 30 minutes, slot index 0 = 00:00, slot index 47 = 23:30
     const slot = (d.getHours() * 2) + Math.floor(d.getMinutes() / 30);
     if (slot > lastSlotIndex) lastSlotIndex = slot;
 
@@ -296,6 +314,7 @@ function update24hrChart(dateRows) {
     const hum = parseFloat(r.humidity);
     const aqi = parseFloat(r.air_quality);
 
+    // skip clearly invalid values (0°C or 0% humidity are almost always sensor errors)
     if (!isNaN(temp) && temp !== 0) tempSlots[slot] = temp;
     if (!isNaN(hum) && hum !== 0) humSlots[slot] = hum;
     if (!isNaN(aqi)) aqiSlots[slot] = aqi;
@@ -305,23 +324,25 @@ function update24hrChart(dateRows) {
   db24hrChart.data.datasets[1].data = humSlots;
   db24hrChart.data.datasets[2].data = aqiSlots;
 
-  // Add the rhythmic "pulse" size to the very last datapoint to match ISRO style telemetry graphs
+  // make the last data point slightly bigger — gives a "pulse" effect at the live edge
   db24hrChart.data.datasets.forEach(ds => {
     ds.pointRadius = ds.data.map((val, idx) => (val !== null && idx === lastSlotIndex) ? 7 : 3);
     ds.pointHoverRadius = ds.data.map((val, idx) => (val !== null && idx === lastSlotIndex) ? 9 : 6);
   });
 
-  db24hrChart.update("none");
+  db24hrChart.update("none");  // no animation, instant update
 }
 
-/* ================================================================
-   UPDATE TIME-SERIES CHARTS  (sampled for performance)
-================================================================ */
+// ─────────────────────────────────────────────────────────────────────────────
+// UPDATE TIME-SERIES CHARTS
+// if there are more than 300 rows, we sample the data (take every Nth row)
+// so the charts don't get too cluttered with thousands of points
+// ─────────────────────────────────────────────────────────────────────────────
 function updateCharts(data) {
   let pts = data;
   if (data.length > 300) {
     const step = Math.ceil(data.length / 300);
-    pts = data.filter((_, i) => i % step === 0 || i === data.length - 1);
+    pts = data.filter((_, i) => i % step === 0 || i === data.length - 1);  // always include the last point
   }
   const labels = pts.map(d => fmtTime(d.created_at));
   const temps = pts.map(d => parseFloat(d.temperature));
@@ -334,9 +355,9 @@ function updateCharts(data) {
   });
 }
 
-/* ================================================================
-   SUMMARY CARDS
-================================================================ */
+// ─────────────────────────────────────────────────────────────────────────────
+// SUMMARY CARDS — shows avg/min/max for each metric plus the overall health score
+// ─────────────────────────────────────────────────────────────────────────────
 function updateSummary(data) {
   const IDS = ["scTempAvg", "scTempMin", "scTempMax", "scTempCount",
     "scHumAvg", "scHumMin", "scHumMax", "scHumCount",
@@ -344,10 +365,12 @@ function updateSummary(data) {
     "scHealthVal", "scHealthMin", "scHealthMax", "scTotalRecords"];
 
   if (!data.length) {
-    IDS.forEach(id => setEl(id, "--"));
+    IDS.forEach(id => setEl(id, "--"));  // nothing to show — fill with dashes
     setEl("scHealthGrade", "No data");
     return;
   }
+
+  // filter out NaN and 0 values (0 usually means the sensor wasn't sending yet)
   const T = data.map(d => parseFloat(d.temperature)).filter(v => !isNaN(v) && v !== 0);
   const H = data.map(d => parseFloat(d.humidity)).filter(v => !isNaN(v) && v !== 0);
   const A = data.map(d => parseFloat(d.air_quality)).filter(v => !isNaN(v));
@@ -365,13 +388,13 @@ function updateSummary(data) {
   const col = hColor(avgS);
   const ve = document.getElementById("scHealthVal");
   const ge = document.getElementById("scHealthGrade");
-  if (ve) ve.style.color = col;   /* data-driven color — must stay in JS */
+  if (ve) ve.style.color = col;   // color the number itself based on how good/bad the score is
   if (ge) ge.style.color = col;
 }
 
-/* ================================================================
-   TABLE RENDER  (paginated)
-================================================================ */
+// ─────────────────────────────────────────────────────────────────────────────
+// DATA TABLE — paginated, shows each sensor reading with its health score
+// ─────────────────────────────────────────────────────────────────────────────
 function renderTable(data) {
   const box = document.getElementById("tableContainer");
   const pgEl = document.getElementById("pagination");
@@ -385,11 +408,12 @@ function renderTable(data) {
   }
 
   const total = Math.ceil(data.length / ROWS_PER_PAGE);
-  currentPage = Math.max(1, Math.min(currentPage, total));
+  currentPage = Math.max(1, Math.min(currentPage, total));  // clamp page within valid range
   const start = (currentPage - 1) * ROWS_PER_PAGE;
   const end = Math.min(start + ROWS_PER_PAGE, data.length);
   setEl("tableInfo", `Showing ${start + 1}–${end} of ${data.length} records`);
 
+  // build the table rows for the current page slice
   const rows = data.slice(start, end).map((d, i) => {
     const hs = healthScore(d.temperature, d.humidity, d.air_quality);
     const ac = d.air_quality <= 100 ? "td-clean" : d.air_quality <= 200 ? "td-moderate" : "td-poor";
@@ -407,7 +431,7 @@ function renderTable(data) {
     <thead><tr><th>#</th><th>Time</th><th>Temperature</th><th>Humidity</th><th>Air Quality</th><th>Health Score</th></tr></thead>
     <tbody>${rows}</tbody></table></div>`;
 
-  /* Pagination */
+  // build the pagination bar with ellipsis for large page counts
   const R = 5, h = Math.floor(R / 2);
   let ps = Math.max(1, currentPage - h), pe = Math.min(total, ps + R - 1);
   if (pe - ps < R - 1) ps = Math.max(1, pe - R + 1);
@@ -419,7 +443,7 @@ function renderTable(data) {
   pg += `<span class="pg-info">Page ${currentPage} of ${total}</span>`;
   pgEl.innerHTML = pg;
 
-  /* Wire pagination clicks via delegation (no inline event handlers) */
+  // wire up the pagination buttons via event delegation (not inline onclick handlers)
   pgEl.querySelectorAll(".pg-btn[data-page]").forEach(btn => {
     btn.addEventListener("click", () => goPage(parseInt(btn.dataset.page, 10)));
   });
@@ -427,6 +451,7 @@ function renderTable(data) {
   pgEl.querySelector("#pgNext")?.addEventListener("click", () => goPage(currentPage + 1));
 }
 
+// handles page changes — clamps to valid range, re-renders, and scrolls the table into view
 function goPage(p) {
   const t = Math.ceil(allData.length / ROWS_PER_PAGE);
   if (p < 1 || p > t) return;
@@ -435,14 +460,17 @@ function goPage(p) {
   document.querySelector(".table-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-/* ================================================================
-   LOAD DATE — main entry point
-================================================================ */
+// ─────────────────────────────────────────────────────────────────────────────
+// LOAD DATE — main function that ties everything together
+// called when the user picks a date or on auto-refresh
+// silent=true means skip the loading spinner (used for background refresh)
+// ─────────────────────────────────────────────────────────────────────────────
 async function loadDate(dateStr, silent = false) {
   selectedDate = dateStr;
   currentPage = 1;
 
   if (!silent) {
+    // show a loading state while we fetch
     document.getElementById("tableContainer").innerHTML =
       `<div class="state-box"><div class="spinner"></div>Fetching records for ${fmtLong(dateStr)}…
        <div class="state-sub">Collecting entries from the database — please wait.</div></div>`;
@@ -451,8 +479,7 @@ async function loadDate(dateStr, silent = false) {
   }
 
   try {
-    // Backend now filters by date in SQL — no client-side filter needed
-    const data = await fetchAllRecords(dateStr);
+    const data = await fetchAllRecords(dateStr);  // uses cache if available
 
     console.log(`[ENVCORE] Records for ${dateStr}: ${data.length}`);
     allData = data;
@@ -470,22 +497,26 @@ async function loadDate(dateStr, silent = false) {
   }
 }
 
-/* ================================================================
-   AUTO-REFRESH every 30 s — silent, reuses cache
-================================================================ */
+// ─────────────────────────────────────────────────────────────────────────────
+// AUTO-REFRESH every 30 seconds
+// silently re-fetches data in the background so today's live data grows in real time
+// we invalidate the cache first if it's today's date, so we actually get new rows
+// ─────────────────────────────────────────────────────────────────────────────
 function startRefresh() {
   if (refreshTimer) clearInterval(refreshTimer);
   refreshTimer = setInterval(() => {
-    /* Invalidate cache for today so we always get fresh data */
-    if (selectedDate === todayStr()) _cacheExpiry = 0;
-    loadDate(selectedDate, true);
+    if (selectedDate === todayStr()) _cacheExpiry = 0;  // force re-fetch for today's data
+    loadDate(selectedDate, true);  // silent = true, no spinner
   }, 30000);
 }
 
-/* ================================================================
-   CSV EXPORT
-================================================================ */
+// ─────────────────────────────────────────────────────────────────────────────
+// CSV + PDF EXPORT, DATE PICKER, BUTTONS, CLOCK, CURSOR, FOOTER
+// all wired up in DOMContentLoaded
+// ─────────────────────────────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", () => {
+
+  // CSV export — builds a comma-separated file from allData and triggers a download
   document.getElementById("csvBtn")?.addEventListener("click", () => {
     if (!allData.length) { alert("No data for this date."); return; }
     const fname = `sensor-data-${dayName(selectedDate)}-${selectedDate}.csv`;
@@ -501,19 +532,19 @@ document.addEventListener("DOMContentLoaded", () => {
     document.body.removeChild(a);
   });
 
+  // PDF export — uses html2canvas to screenshot the dashboard, then jsPDF to embed it in a PDF
   document.getElementById("pdfBtn")?.addEventListener("click", () => {
     if (!allData.length) { alert("No data for this date."); return; }
-    
-    // Set export button to loading state
+
     const pdfBtn = document.getElementById("pdfBtn");
     const origText = pdfBtn.innerHTML;
-    pdfBtn.innerHTML = "Generating...";
+    pdfBtn.innerHTML = "Generating...";  // show a loading label while rendering
 
-    // Hide actions from the top bar
+    // hide the action buttons from the screenshot (they'd look weird in the PDF)
     const actions = document.querySelector(".date-bar-right");
     if (actions) actions.style.display = "none";
-    
-    // Hide the data table and pagination so it only captures up to the AQI graph
+
+    // hide the data table — we only want the charts and summary in the PDF
     const tablePanels = document.querySelectorAll(".table-panel, #tableContainer, #pagination");
     const originalDisplays = [];
     tablePanels.forEach((el, index) => {
@@ -524,7 +555,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const exportArea = document.querySelector(".db-wrap");
 
     html2canvas(exportArea, { scale: 1.5, backgroundColor: "#06101e", useCORS: true }).then(canvas => {
-      // Restore the DOM
+      // restore the DOM back to normal before saving the PDF
       if (actions) actions.style.display = "flex";
       tablePanels.forEach((el, index) => {
         el.style.display = originalDisplays[index];
@@ -533,12 +564,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const imgData = canvas.toDataURL("image/jpeg", 0.95);
       const { jsPDF } = window.jspdf;
-      const pdf = new jsPDF("p", "mm", "a4");
+      const pdf = new jsPDF("p", "mm", "a4");  // portrait A4
 
       const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;  // scale proportionally
 
-      // Add a header
+      // header text at the top of the page
       pdf.setFont("helvetica", "bold");
       pdf.setFontSize(16);
       pdf.text(`ENVCORE Dashboard Report: ${selectedDate}`, 15, 15);
@@ -546,7 +577,7 @@ document.addEventListener("DOMContentLoaded", () => {
       pdf.addImage(imgData, "JPEG", 5, 25, pdfWidth - 10, pdfHeight);
       pdf.save(`ENVCORE_Report_${selectedDate}.pdf`);
     }).catch(err => {
-      // Restore the DOM on error
+      // restore DOM even if the export fails
       if (actions) actions.style.display = "flex";
       tablePanels.forEach((el, index) => {
         el.style.display = originalDisplays[index];
@@ -556,25 +587,25 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  /* ── Date Picker ── */
+  // date picker — when user picks a new date, load that date's data
   const picker = document.getElementById("datePicker");
   if (picker) {
     picker.value = todayStr();
-    picker.max = todayStr();
+    picker.max = todayStr();  // prevent picking future dates
     picker.addEventListener("change", () => {
-      document.querySelectorAll(".qd-btn").forEach(b => b.classList.remove("active"));
+      document.querySelectorAll(".qd-btn").forEach(b => b.classList.remove("active"));  // deselect quick-date buttons
       loadDate(picker.value);
       startRefresh();
     });
   }
 
-  /* ── Quick Date Buttons ── */
+  // quick-date buttons (Today, Yesterday, 2 days ago etc.) — each has a data-offset attribute
   document.querySelectorAll(".qd-btn").forEach(btn => {
     btn.addEventListener("click", function () {
       document.querySelectorAll(".qd-btn").forEach(b => b.classList.remove("active"));
       this.classList.add("active");
       const d = new Date();
-      d.setDate(d.getDate() - parseInt(this.dataset.offset, 10));
+      d.setDate(d.getDate() - parseInt(this.dataset.offset, 10));  // go back N days
       const str = `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
       if (picker) picker.value = str;
       loadDate(str);
@@ -582,24 +613,22 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  /* ── Clock ── */
+  // live clock display in the header — updates every second
   (function tick() {
     const e = document.getElementById("clockDisplay");
     if (e) e.textContent = new Date().toLocaleTimeString("en-GB");
     setTimeout(tick, 1000);
   })();
 
-  /* ── Theme Toggle ── */
+  // dark/light theme toggle — swaps data-theme attribute on <html> and updates button style
   document.getElementById("themeToggle")?.addEventListener("click", function () {
     const dark = document.documentElement.getAttribute("data-theme") === "dark";
     document.documentElement.setAttribute("data-theme", dark ? "light" : "dark");
     this.classList.toggle("light-mode", dark);
   });
 
-  /* ── Background Canvas: handled by charts.js (weather animations) ── */
-
-
-  /* ── Footer Ticker ── */
+  // footer scrolling ticker — built the same way as index.html
+  // duplicated so the CSS marquee animation loops seamlessly
   const footerTicker = document.getElementById('footerTickerInner');
   if (footerTicker) {
     const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -607,10 +636,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const nw = new Date();
     const dateStr = `${DAYS[nw.getDay()]}, ${nw.getDate()} ${MONTHS[nw.getMonth()]} ${nw.getFullYear()}`;
     const seg = `<div class="ft-segment">Made with <span class="ft-heart">❤</span><span class="ft-sep"></span><span class="ft-author">Tapananshu Tripathy</span><span class="ft-sep"></span><span class="ft-date">❆ ${dateStr} ❆</span><span class="ft-sep"></span>ENVCORE — Historical Dashboard<span class="ft-sep"></span>B.Tech CSE · KIIT University · Bhubaneswar</div>`;
-    footerTicker.innerHTML = seg + seg;
+    footerTicker.innerHTML = seg + seg;  // double segment for seamless animation loop
   }
 
-  /* ── Custom Cursor ── */
+  // custom cursor — neon dot + outer ring, same logic as index.html
   const cursor = document.getElementById('customCursor');
   const cursorRing = document.getElementById('customCursorRing');
   if (cursor && cursorRing) {
@@ -629,7 +658,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.body.addEventListener('mouseout', e => { if (e.target.closest(sel)) document.body.classList.remove('cursor-hovering'); });
   }
 
-  /* ── Initial load ── */
+  // initial load — fetch today's data when the page first opens
   loadDate(todayStr());
-  startRefresh();
+  startRefresh();  // start the 30-second silent refresh loop
 });
