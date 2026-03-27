@@ -166,14 +166,7 @@ function build24hrChart(id) {
       datasets: [
         {
           label: "Temperature (°C)", borderColor: COLORS.temp,
-          segment: {
-            // color each line segment dynamically based on the temperature value at that point
-            borderColor: ctx => {
-              if (!ctx.p0 || !ctx.p1) return COLORS.temp;
-              const y = ctx.p0.parsed.y;
-              return y >= 32 ? '#ff4d4d' : y >= 24 ? '#00ff88' : '#00e5ff';  // hot = red, normal = green, cold = blue
-            }
-          },
+          // single solid color throughout — no dynamic per-segment coloring
           backgroundColor: rgba(COLORS.temp, 0.08),
           data: new Array(48).fill(null),  // start with all nulls (no data)
           tension: 0.4, pointRadius: 3, pointHoverRadius: 6,
@@ -188,14 +181,7 @@ function build24hrChart(id) {
         },
         {
           label: "Air Quality Index", borderColor: COLORS.aqi,
-          segment: {
-            // color AQI line red when hazardous, yellow when moderate, green when good
-            borderColor: ctx => {
-              if (!ctx.p0 || !ctx.p1) return COLORS.aqi;
-              const y = ctx.p0.parsed.y;
-              return y >= 100 ? '#ff4d4d' : y >= 60 ? '#ffcc00' : '#00ff88';
-            }
-          },
+          // single solid color throughout — no dynamic per-segment coloring
           backgroundColor: rgba(COLORS.aqi, 0.08),
           data: new Array(48).fill(null),
           tension: 0.4, pointRadius: 3, pointHoverRadius: 6,
