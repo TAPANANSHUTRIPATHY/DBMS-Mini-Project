@@ -1,11 +1,9 @@
-/* ================================================================
-   charts.js — ENVCORE UI Layer (loads after script.js)
-   Reads window.ENVDATA set by script.js.
-   Owns: humLineChart, humGauge, healthRing, modal charts,
-         sparklines, animated bg, theme, clock, geo, alerts.
-   KEY FIX: Only updates when backend is ONLINE (ENVDATA.ready).
-            When offline: all values show "--", no stale data.
-================================================================ */
+// charts.js — ENVCORE UI layer, always loaded after script.js
+// this file reads the window.ENVDATA bus that script.js populates every second
+// it owns: humidity chart, health ring, modal fullscreen charts, sparklines,
+//          the animated background canvas, theme toggle, clock, and smart toast alerts
+// key rule: if ENVDATA.ready is false (backend offline), we don't touch the UI
+//           so stale data never shows — all values reset to "--"
 (function () {
   "use strict";
 
@@ -26,6 +24,8 @@
   function ctx(id) { const e = document.getElementById(id); return e ? e.getContext("2d") : null; }
   function setEl(id, v) { const e = document.getElementById(id); if (e) e.textContent = v; }
 
+  // calculates min / avg / max from an array of numbers
+  // returns "--" strings if the array is empty so text fields show dashes when offline
   function statsOf(arr) {
     if (!arr || !arr.length) return { min: "--", max: "--", avg: "--" };
     return {
@@ -35,7 +35,10 @@
     };
   }
 
-  /* ── Line chart factory ── */
+  // ─────────────────────────────────────────────────────────────────────────────
+  // LINE CHART FACTORY — shared theme for all the secondary line charts on index.html
+  // used for humidity, and the 3 fullscreen modal charts (temp/hum/aqi in large canvas)
+  // ─────────────────────────────────────────────────────────────────────────────
   function makeLine(canvasId, label, color, yr) {
     const c = ctx(canvasId);
     if (!c) return null;
@@ -91,7 +94,10 @@
     });
   }
 
-  /* ── Chart instances ── */
+  // ─────────────────────────────────────────────────────────────────────────────
+  // CHART INSTANCES — created immediately when this script runs (not inside DOMContentLoaded)
+  // Chart.js only needs the canvas context, which exists as soon as the script tag parses
+  // ─────────────────────────────────────────────────────────────────────────────
   const humLineChart = makeLine("humLineChart", "Humidity (%)", CYAN, YR.hum);
   const tempLargeChart = makeLine("tempLargeCanvas", "Temperature (°C)", RED, YR.temp);
   const humLargeChart = makeLine("humLargeCanvas", "Humidity (%)", CYAN, YR.hum);
@@ -117,7 +123,7 @@
   const humSpk = makeSpark("humSparkline", CYAN);
   const airSpk = makeSpark("airSparkline", GREEN);
 
-  /* ── Mirror helper ── */
+  // helper: pushes new data into a chart without triggering animation ("none" = instant update)
   function mirror(chart, labels, data) {
     if (!chart || !labels || !labels.length) return;
     chart.data.labels = labels;
@@ -125,7 +131,8 @@
     chart.update("none");
   }
 
-  /* ── Reset all charts to empty when backend goes offline ── */
+  // resets every chart and every stat badge to "--" when the backend goes offline
+  // this prevents stale numbers from lingering on screen after the ESP32 disconnects
   function clearAllCharts() {
     [humLineChart, tempLargeChart, humLargeChart, airLargeChart,
       tempSpk, humSpk, airSpk].forEach(ch => {
@@ -139,9 +146,11 @@
       "healthScore", "healthGrade", "hlTemp", "hlHum", "hlAqi"].forEach(id => setEl(id, "--"));
   }
 
-  /* ================================================================
-     HEALTH RING (Customizable via localStorage)
-  ================================================================ */
+  // ─────────────────────────────────────────────────────────────────────────────
+  // HEALTH RING — the doughnut chart in the bottom-left of the dashboard
+  // shows 3 segments: temperature score, humidity score, AQI score (each 0–100)
+  // ideal values are user-configurable via the settings modal and stored in localStorage
+  // ─────────────────────────────────────────────────────────────────────────────
   function updateHealth(temp, hum, aqi) {
     const idealTemp = parseFloat(localStorage.getItem("ideal_temp")) || 22;
     const idealHum = parseFloat(localStorage.getItem("ideal_hum")) || 50;
@@ -191,9 +200,12 @@
     if (elAqi) elAqi.title = `Score out of 100 based on Max AQI tolerance: ${maxAqi}`;
   }
 
-  /* ================================================================
-     CARD BG + BARS
-  ================================================================ */
+  // ─────────────────────────────────────────────────────────────────────────────
+  // CARD BACKGROUNDS + PROGRESS BARS
+  // the colored radial gradient behind each card shifts based on the current reading
+  // e.g. a hot temperature makes the temp card background shift toward red
+  // the narrow progress bar at the bottom of each card also animates to reflect the value
+  // ─────────────────────────────────────────────────────────────────────────────
   function updateCards(temp, hum, aqi) {
     const th = Math.round(220 - Math.min(Math.max(temp, 0), 50) / 50 * 220);
     const tb = document.querySelector(".temp-bg");
@@ -209,9 +221,11 @@
     if (aBar) aBar.style.width = `${Math.min(aqi / 500 * 100, 100)}%`;
   }
 
-  /* ================================================================
-     ALERTS
-  ================================================================ */
+  // ─────────────────────────────────────────────────────────────────────────────
+  // BANNER ALERTS — fires a one-line alert on the news ticker banner when conditions are extreme
+  // note: this is a quick visual flash only, NOT the same as the email/SMS alert system in alerts.js
+  // has a 15-second cooldown so it doesn't spam the banner on every sync tick
+  // ─────────────────────────────────────────────────────────────────────────────
   let _lastAlert = 0;
   function checkAlerts(temp, hum, aqi) {
     if (Date.now() - _lastAlert < 15000) return;
@@ -228,9 +242,11 @@
     if (b && t) { t.textContent = msgs[0]; b.classList.remove("hidden"); _lastAlert = Date.now(); }
   }
 
-  /* ================================================================
-     MAIN SYNC — polls ENVDATA every 1.5s
-  ================================================================ */
+  // ─────────────────────────────────────────────────────────────────────────────
+  // MAIN SYNC LOOP — reads the ENVDATA bus set by script.js and updates the UI
+  // runs every 1 second to match the fetchLatest interval in script.js
+  // skips heavy chart mirror() calls if nothing has changed since last sync
+  // ─────────────────────────────────────────────────────────────────────────────
   let _lastSyncTs = "";
   let _syncCount = 0;
 
@@ -238,14 +254,14 @@
     _syncCount++;
     const D = window.ENVDATA;
 
-    /* Data not ready yet */
+    // ENVDATA isn't ready yet — script.js hasn't completed its first fetch
     if (!D || !D.ready) {
       return;
     }
 
     const lastTs = D.labels[D.labels.length - 1];
-    /* Always sync humidity + gauges + health even if no new point.
-       Only skip the heavy mirror() calls when truly nothing changed. */
+    // always sync health ring + gauges even if no new data point came in
+    // only the heavy mirror() calls are skipped when truly nothing changed
     const hasNew = (lastTs !== _lastSyncTs);
     if (hasNew) _lastSyncTs = lastTs;
 
@@ -256,7 +272,7 @@
 
     if (isNaN(latestTemp) || isNaN(latestHum) || isNaN(latestAqi)) return;
 
-    /* Always redraw charts so they don't vanish or break randomly when backend is quiet. */
+    // always redraw charts unconditionally so they don't vanish when data is briefly stale
     mirror(humLineChart, labels, hums);
     mirror(tempLargeChart, labels, temps);
     mirror(humLargeChart, labels, hums);
@@ -265,13 +281,13 @@
     mirror(humSpk, labels, hums);
     mirror(airSpk, labels, aqis);
 
-    /* Health ring — MUST be called every sync */
+    // health ring depends on the latest single value, so recalculate every tick
     updateHealth(latestTemp, latestHum, latestAqi);
 
-    /* Card backgrounds + bars */
+    // update the card gradient backgrounds and progress bars
     updateCards(latestTemp, latestHum, latestAqi);
 
-    /* Stats badges — always refresh */
+    // refresh all the min/avg/max stat badges using the full current data window
     const ts = statsOf(temps), hs = statsOf(hums), as = statsOf(aqis);
     ["Min", "Avg", "Max"].forEach((k, i) => {
       setEl("temp" + k, [ts.min, ts.avg, ts.max][i]);
@@ -284,23 +300,28 @@
 
     checkAlerts(latestTemp, latestHum, latestAqi);
 
-    /* Smart Recommendations */
+    // run the smart recommendation engine to show useful health tips as toasts
     updateRecommendations(latestTemp, latestHum, latestAqi);
   }
 
-  /* ================================================================
-     SMART RECOMMENDATIONS ENGINE 🤖
-     Rule-based toast popup system — fires when conditions change
-  ================================================================ */
+  // ─────────────────────────────────────────────────────────────────────────────
+  // SMART RECOMMENDATIONS ENGINE 🤖
+  // rule-based system that fires toast popups when sensor values cross health thresholds
+  // uses a "key" derived from the current set of active tips — if nothing changed and
+  // the cooldown hasn't expired, no new toasts are shown (avoids spamming)
+  // ─────────────────────────────────────────────────────────────────────────────
   let _lastRecoKey = "";
   let _lastRecoTime = 0;
-  const RECO_COOLDOWN = 30000; /* only re-fire toasts every 30s if conditions unchanged */
+  const RECO_COOLDOWN = 30000;  // only re-fire toasts every 30s even if conditions are unchanged
 
+  // creates and appends a toast notification card to the toastContainer
+  // severity controls the color class: "critical", "danger", "warning", or "info"
+  // auto-removes itself after 8 seconds using a CSS fade-out transition
   function showToast(icon, text, severity) {
     const container = document.getElementById("toastContainer");
     if (!container) return;
 
-    /* Limit to 4 toasts max visible */
+    // cap at 4 visible toasts so the screen doesn't get buried under notifications
     while (container.children.length >= 4) {
       container.removeChild(container.firstChild);
     }
@@ -315,11 +336,11 @@
     `;
     container.appendChild(toast);
 
-    /* Auto-remove after 8s */
+    // auto-remove after 8 seconds — add the exit class first to trigger the CSS slide-out
     setTimeout(() => {
       if (toast.parentElement) {
         toast.classList.add("toast-exit");
-        setTimeout(() => toast.remove(), 350);
+        setTimeout(() => toast.remove(), 350);  // wait for the 350ms CSS transition to finish
       }
     }, 8000);
   }
@@ -360,53 +381,61 @@
       tips.push({ icon: "⚠️", text: "Heat + humidity combo — dangerous heat index!", severity: "danger" });
     }
 
-    /* Only fire toasts if conditions changed or cooldown expired */
+    // build a fingerprint of the current tip set — only fire toasts when something changes
     const key = tips.map(t => t.severity + t.icon).join("|");
     const now = Date.now();
     if (key === _lastRecoKey && (now - _lastRecoTime) < RECO_COOLDOWN) return;
     _lastRecoKey = key;
     _lastRecoTime = now;
 
-    /* Fire toast for each tip (staggered) */
+    // stagger each toast 400ms apart so they don't all pop up at once
     tips.forEach((t, i) => {
       setTimeout(() => showToast(t.icon, t.text, t.severity), i * 400);
     });
   }
 
-  setInterval(sync, 1000);  /* match 1s fetchLatest interval */
-  setTimeout(sync, 600);
+  setInterval(sync, 1000);  // match fetch interval from script.js (1 second)
+  setTimeout(sync, 600);    // run once early so there's data from the first fetch
 
-  /* ================================================================
-     MODALS — resize charts on open; open/close owned by script.js
-  ================================================================ */
-  /* Register chart resize callbacks for script.js to trigger */
+  // ─────────────────────────────────────────────────────────────────────────────
+  // MODAL CHART RESIZE
+  // modal open/close is handled by script.js — it calls window._modalResizeFn() after the
+  // CSS transition starts so Chart.js gets the correct final canvas dimensions to resize to
+  // without this, charts in modals often render at the wrong size on first open
+  // ─────────────────────────────────────────────────────────────────────────────
   window._modalResizeFn = function (id) {
     if (id === "tempModal" && tempLargeChart) tempLargeChart.resize();
     if (id === "humModal" && humLargeChart) humLargeChart.resize();
     if (id === "airModal" && airLargeChart) airLargeChart.resize();
   };
 
-  /* ================================================================
-     CLOCK
-  ================================================================ */
+  // ─────────────────────────────────────────────────────────────────────────────
+  // LIVE CLOCK — updates the header clock display every second
+  // uses an IIFE + recursive setTimeout so the interval stays precise
+  // ─────────────────────────────────────────────────────────────────────────────
   (function tick() {
     const el = document.getElementById("clockDisplay");
     if (el) el.textContent = new Date().toLocaleTimeString("en-GB");
     setTimeout(tick, 1000);
   })();
 
-  /* ================================================================
-     THEME TOGGLE
-  ================================================================ */
+  // ─────────────────────────────────────────────────────────────────────────────
+  // THEME TOGGLE — switches the data-theme attribute on <html> between "dark" and "light"
+  // CSS variables are set up in style.css to respond to [data-theme="light"]
+  // ─────────────────────────────────────────────────────────────────────────────
   document.getElementById("themeToggle")?.addEventListener("click", function () {
     const dark = document.documentElement.getAttribute("data-theme") === "dark";
     document.documentElement.setAttribute("data-theme", dark ? "light" : "dark");
-    this.classList.toggle("light-mode", dark);
+    this.classList.toggle("light-mode", dark);  // the button also changes its own icon via CSS
   });
 
-  /* ================================================================
-     ANIMATED BACKGROUND
-  ================================================================ */
+  // ─────────────────────────────────────────────────────────────────────────────
+  // ANIMATED BACKGROUND CANVAS
+  // draws a live particle network + floating weather symbols on the <canvas id="bgCanvas">
+  // the animation responds to real weather conditions from Open-Meteo: rain, sun, clouds, night sky
+  // if script.js already fetched weather, we read window.cityWeatherContext directly
+  // otherwise this block fetches its own weather (used on dashboard.html and alerts.html)
+  // ─────────────────────────────────────────────────────────────────────────────
   (function animBg() {
     const cv = document.getElementById("bgCanvas");
     if (!cv) return;
@@ -416,8 +445,9 @@
     resize();
     window.addEventListener("resize", resize);
 
-    /* ── Self-fetching weather context for dashboard/alerts pages ── */
-    /* This mirrors script.js fetchCityWeather so all pages get live weather */
+    // fetch weather for pages that don't include script.js (dashboard.html, alerts.html)
+    // reuses the same Open-Meteo API call as script.js — if cityWeatherContext is already
+    // set (i.e. we're on index.html), this block is skipped entirely
     const WMO_LABELS = {
       0: 'Clear sky', 1: 'Mainly clear', 2: 'Partly cloudy', 3: 'Overcast',
       45: 'Fog', 48: 'Fog', 51: 'Drizzle', 53: 'Drizzle', 55: 'Drizzle',
@@ -454,10 +484,10 @@
           };
         })
         .catch(() => {
-          /* fallback — Bhubaneswar averages */
+          // fallback to Bhubaneswar average conditions if the weather API fails
           window.cityWeatherContext = { condition: 'Clear sky', icon: '☀️', temp: 25, wind: 5, humidity: 60, sunriseMs: null, sunsetMs: null };
         });
-      /* Immediately set a default so the bg loop starts with something */
+      // set an immediate default so the background animation loop starts right away
       window.cityWeatherContext = window.cityWeatherContext || { condition: 'Clear sky', icon: '☀️', temp: 25, wind: 5, humidity: 60, sunriseMs: null, sunsetMs: null };
     }
 
@@ -777,21 +807,24 @@
     })();
   })();
 
-  /* ================================================================
-     HEALTH SETTINGS MODAL BINDINGS
-  ================================================================ */
+  // ─────────────────────────────────────────────────────────────────────────────
+  // HEALTH SETTINGS MODAL
+  // the gear icon on the health ring card opens a modal where the user can set their ideal
+  // temperature, humidity, and AQI tolerance — these values go into localStorage and are
+  // read by updateHealth() on every sync tick to recalculate the health score
+  // ─────────────────────────────────────────────────────────────────────────────
   document.addEventListener("DOMContentLoaded", () => {
     const sBtn = document.getElementById("saveHealthSettingsBtn");
     const iT = document.getElementById("idealTempInput");
     const iH = document.getElementById("idealHumInput");
     const iA = document.getElementById("maxAqiInput");
 
-    // Load initial values to modal inputs
+    // pre-fill the modal inputs with whatever was saved before (or sensible defaults)
     if (iT) iT.value = localStorage.getItem("ideal_temp") || 22;
     if (iH) iH.value = localStorage.getItem("ideal_hum") || 50;
     if (iA) iA.value = localStorage.getItem("max_aqi") || 500;
 
-    // Handle Save
+    // saving writes to localStorage then immediately recalculates the health ring
     if (sBtn) {
       sBtn.addEventListener("click", () => {
         localStorage.setItem("ideal_temp", iT.value);
@@ -811,10 +844,12 @@
       });
     }
 
-    // Modal open binding (global delegate)
+    // use event delegation on the whole document to catch clicks on the gear button
+    // this works even if the button is inside a dynamically inserted element
     document.addEventListener("click", (e) => {
       const g = e.target.closest("[data-modal]");
       if (g && g.dataset.modal === "healthSettingsModal") {
+        // refresh inputs from localStorage in case they changed since last time
         if (iT) iT.value = localStorage.getItem("ideal_temp") || 22;
         if (iH) iH.value = localStorage.getItem("ideal_hum") || 50;
         if (iA) iA.value = localStorage.getItem("max_aqi") || 500;
